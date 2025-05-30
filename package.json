@@ -1,0 +1,25 @@
+{
+  "name": "woltage-monorepo",
+  "version": "1.0.0",
+  "description": "",
+  "license": "ISC",
+  "author": "wesone",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "find ./packages -maxdepth 2 ! -path \"*/node_modules/*\" -name \"package.json\" -printf '%p\n' -execdir npm run build \\;",
+    "postinstall": "find ./packages -maxdepth 2 ! -path \"*/node_modules/*\" -name \"package.json\" -printf '%p\n' -execdir npm i \\;"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/wesone/woltage.git"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.25.1",
+    "@types/node": "^22.15.3",
+    "eslint": "^9.25.1",
+    "globals": "^16.0.0",
+    "typescript-eslint": "^8.31.1",
+    "weslint": "github:wesone/eslint"
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "name": "woltage-example-authentication",
+  "version": "1.0.0",
+  "main": "src/index.js",
+  "private": true,
+  "scripts": {
+    "start": "node --watch src/index.ts",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "wesone",
+  "license": "ISC",
+  "type": "module",
+  "description": "",
+  "dependencies": {
+    "@woltage/eventstore-kurrentdb": "file:../../packages/eventstore-kurrentdb",
+    "@woltage/store-mongodb": "file:../../packages/store-mongodb",
+    "@woltage/store-redis": "file:../../packages/store-redis",
+    "body-parser": "^2.2.0",
+    "express": "^5.1.0",
+    "helmet": "^8.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "woltage": "file:../../packages/woltage",
+    "zod": "^3.25.28"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.1",
+    "@types/jsonwebtoken": "^9.0.9",
+    "@types/node": "^22.15.3",
+    "typescript": "^5.8.3"
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "name": "woltage",
+  "version": "1.0.0",
+  "description": "",
+  "license": "ISC",
+  "author": "wesone",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "npx tsc -p tsconfig.json",
+    "test": "node --test --experimental-test-coverage './test/**/*.test.*'",
+    "test-watch": "node --watch --test './test/**/*.test.*'"
+  },
+  "peerDependencies": {
+    "zod": "^3.25.28"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.3"
+  },
+  "files": [
+    "/dist"
+  ]
+}

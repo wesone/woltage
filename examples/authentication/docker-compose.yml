@@ -1,0 +1,56 @@
+services:
+  nodejs:
+    image: node:23.11.0
+    ports:
+      - 3000:3000
+    volumes:
+      - ../../:/usr/src/app
+    working_dir: /usr/src/app/examples/authentication
+    environment:
+      - NODE_ENV=development
+      - JWT_PRIVATE_KEY=example-secret-Lac0*0ms5!I9EZ*y?IN=&0TM[o]{67Tw7M7\l/-}g/7YlP%Q#)
+      - KURRENT_CONNECTION_STRING=kurrentdb://kurrentdb.db:2113?tls=false
+      - REDIS_CONNECTION_STRING=redis://redis:6379
+      - MONGO_CONNECTION_STRING=mongodb://admin:admin@mongo:27017/example-authentication?authSource=admin
+    command: "npm start"
+    depends_on:
+      - kurrentdb.db
+      - redis
+      - mongo
+  kurrentdb.db:
+    image: docker.kurrent.io/kurrent-latest/kurrentdb:latest
+    environment:
+      - KURRENTDB_CLUSTER_SIZE=1
+      - KURRENTDB_RUN_PROJECTIONS=All
+      - KURRENTDB_START_STANDARD_PROJECTIONS=true
+      - KURRENTDB_NODE_PORT=2113
+      - KURRENTDB_INSECURE=true
+      - KURRENTDB_ENABLE_ATOM_PUB_OVER_HTTP=true
+    ports:
+      - "2113:2113"
+    volumes:
+      - type: volume
+        source: kurrentdb-volume-data
+        target: /var/lib/kurrentdb
+      - type: volume
+        source: kurrentdb-volume-logs
+        target: /var/log/kurrentdb
+  redis:
+    image: 'redis:alpine'
+    ports:
+      - '6379:6379'
+  mongo:
+    image: mongo
+    ports:
+      - '27017:27017'
+    restart: always
+    logging:
+      options:
+        max-size: 1g
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=admin
+      - MONGO_INITDB_ROOT_PASSWORD=admin
+
+volumes:
+  kurrentdb-volume-data:
+  kurrentdb-volume-logs:

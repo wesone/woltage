@@ -1,0 +1,24 @@
+{
+  "name": "@woltage/store-redis",
+  "version": "1.0.0",
+  "description": "",
+  "license": "ISC",
+  "author": "wesone",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "npx tsc -p tsconfig.json",
+    "test": "node --test --experimental-test-coverage './test/**/*.test.*'",
+    "test-watch": "node --watch --test './test/**/*.test.*'"
+  },
+  "peerDependencies": {
+    "redis": "^5.0.1",
+    "woltage": "file:../woltage"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.3"
+  },
+  "files": [
+    "/dist"
+  ]
+}
