@@ -1,6 +1,6 @@
 {
   "name": "@woltage/store-mongodb",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "",
   "license": "ISC",
   "author": "wesone",
@@ -13,7 +13,7 @@
   },
   "peerDependencies": {
     "mongodb": "^6.16.0",
-    "woltage": "file:../woltage"
+    "woltage": "^1.0.0"
   },
   "devDependencies": {
     "typescript": "^5.8.3"
