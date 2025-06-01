@@ -1,5 +1,19 @@
-import {Event, IEventStore, ReadOptions, AppendRevision, Filter, SubscribeOptions, NotFoundError} from 'woltage';
-import {START, END, STATE_NEW, STATE_EXISTS, FORWARDS, BACKWARDS, ConflictError} from 'woltage';
+import {
+    Event,
+    ConflictError,
+    NotFoundError,
+    START,
+    END,
+    STATE_NEW,
+    STATE_EXISTS,
+    FORWARDS,
+    BACKWARDS,
+    type IEventStore,
+    type AppendRevision,
+    type Filter,
+    type ReadOptions,
+    type SubscribeOptions
+} from 'woltage';
 import {
     KurrentDBClient,
     START as KURRENT_START,
@@ -8,16 +22,15 @@ import {
     STREAM_EXISTS,
     FORWARDS as KURRENT_FORWARDS,
     BACKWARDS as KURRENT_BACKWARDS,
-
     WrongExpectedVersionError,
     StreamNotFoundError,
-    ReadStreamOptions,
     eventTypeFilter,
-    SubscribeToAllOptions,
     jsonEvent,
-    Position,
-    JSONEventOptions,
-    ResolvedEvent,
+    type JSONEventOptions,
+    type Position,
+    type ReadStreamOptions,
+    type ResolvedEvent,
+    type SubscribeToAllOptions,
 } from '@kurrent/kurrentdb-client';
 import {Transform} from 'stream';
 
@@ -45,7 +58,7 @@ const CONSTANTS = Object.freeze({
     [BACKWARDS]: KURRENT_BACKWARDS
 });
 
-export default class KurrentDBAdapter implements IEventStore
+export default class KurrentDBEventStore implements IEventStore
 {
     #client: KurrentDBClient;
 

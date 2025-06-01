@@ -22,3 +22,5 @@ export {default as validate} from './src/validate.ts';
 
 export type * from './src/WoltageConfig.ts';
 export {default, type Woltage} from './src/Woltage.ts';
+
+export {z} from 'zod/v4';

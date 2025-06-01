@@ -1,7 +1,7 @@
+import type {IStore, TableDefinitionMap, TableDefinition, ITable, TableEntry, TableKey, TablePartialEntry} from 'woltage';
 import {createClient, type RedisClientOptions} from 'redis';
-import type {IStore, ITable, Definition, TableKey, TableEntry, TablePartialEntry, DefinitionMap} from 'woltage';
 
-class Table<Def extends Definition> implements ITable<Def> {
+class Table<Def extends TableDefinition> implements ITable<Def> {
     name: string;
     definition: Def;
     client: ReturnType<typeof createClient>;
@@ -10,6 +10,15 @@ class Table<Def extends Definition> implements ITable<Def> {
         this.name = name;
         this.definition = definition;
         this.client = client;
+
+        return new Proxy(this, {
+            get(target, prop, receiver) {
+                const ownProperty = Reflect.get(target, prop, receiver);
+                if(ownProperty !== undefined)
+                    return ownProperty;
+                return Reflect.get(target.client, prop, receiver);
+            }
+        });
     }
 
     #serialize(value: any) {
@@ -75,9 +84,9 @@ class Table<Def extends Definition> implements ITable<Def> {
     }
 }
 
-export default class RedisStore<Definitions extends DefinitionMap> implements IStore {
+export default class RedisStore<Definitions extends TableDefinitionMap> implements IStore {
     prefix: string;
-    tables!: { [K in keyof Definitions]: ITable<Definitions[K]>; };
+    tables!: { [K in keyof Definitions]: Table<Definitions[K]> & ReturnType<typeof createClient>; };
     #client: ReturnType<typeof createClient>;
 
     constructor(prefix: string, clientOptions: RedisClientOptions) {

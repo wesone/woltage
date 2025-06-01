@@ -1,15 +1,22 @@
 {
   "name": "woltage",
-  "version": "1.0.0",
-  "description": "",
+  "version": "1.0.2",
+  "description": "A CQRS and Event-Sourcing Framework",
   "license": "ISC",
   "author": "wesone",
   "type": "module",
   "main": "dist/index.js",
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/wesone/woltage.git"
+  },
+  "homepage": "https://github.com/wesone/woltage",
   "scripts": {
     "build": "npx tsc -p tsconfig.json",
     "test": "node --test --experimental-test-coverage './test/**/*.test.*'",
-    "test-watch": "node --watch --test './test/**/*.test.*'"
+    "test-watch": "node --watch --test './test/**/*.test.*'",
+    "prepack": "(npm run build) && (cp ../../README.md ./)",
+    "postpack": "rm README.md"
   },
   "peerDependencies": {
     "zod": "^3.25.28"
@@ -19,5 +26,25 @@
   },
   "files": [
     "/dist"
+  ],
+  "keywords": [
+    "woltage",
+    "event sourcing",
+    "eventsourcing",
+    "event store",
+    "eventstore",
+    "event",
+    "event driven design",
+    "cqrs",
+    "command",
+    "query",
+    "ddd",
+    "domain driven design",
+    "aggregate",
+    "projection",
+    "projector",
+    "read model",
+    "readmodel",
+    "framework"
   ]
 }

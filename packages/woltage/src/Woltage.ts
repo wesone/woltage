@@ -137,7 +137,7 @@ class Woltage
             (
                 typeof this.config.readModelClasses === 'string'
                     ? await Woltage.#importModules(this.config.readModelClasses, module => module.prototype instanceof ReadModel)
-                    : this.config.readModelClasses
+                    : this.config.readModelClasses ?? []
             )
                 .map(ReadModelClass => [ReadModelClass.toString(), new ReadModelClass()])
         );

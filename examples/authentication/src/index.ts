@@ -3,12 +3,12 @@ import stores from './stores.ts';
 import createServer from './api/server.ts';
 import addProjections from './defaultProjections.ts';
 import {ROLES} from './ACL.ts';
-import KurrentDBAdapter from '@woltage/eventstore-kurrentdb';
+import KurrentDBEventStore from '@woltage/eventstore-kurrentdb';
 
 // init woltage
 const woltage = await createWoltage({
     eventStore: {
-        adapter: KurrentDBAdapter,
+        adapter: KurrentDBEventStore,
         args: [process.env.KURRENT_CONNECTION_STRING!]
     },
     eventClasses: import.meta.dirname + '/events',

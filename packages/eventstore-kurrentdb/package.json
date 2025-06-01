@@ -1,21 +1,27 @@
 {
   "name": "@woltage/eventstore-kurrentdb",
-  "version": "1.0.1",
-  "description": "",
+  "version": "1.0.2",
+  "description": "KurrentDB adapter for Woltage",
   "license": "ISC",
   "author": "wesone",
   "type": "module",
   "main": "dist/index.js",
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/wesone/woltage.git"
+  },
+  "homepage": "https://github.com/wesone/woltage",
   "scripts": {
     "build": "npx tsc -p tsconfig.json",
     "test": "node --test --experimental-test-coverage './test/**/*.test.*'",
-    "test-watch": "node --watch --test './test/**/*.test.*'"
+    "test-watch": "node --watch --test './test/**/*.test.*'",
+    "prepack": "npm run build"
   },
   "dependencies": {
     "@kurrent/kurrentdb-client": "^1.0.1"
   },
   "peerDependencies": {
-    "woltage": "^1.0.0"
+    "woltage": "^1.0.2"
   },
   "devDependencies": {
     "typescript": "^5.8.3"

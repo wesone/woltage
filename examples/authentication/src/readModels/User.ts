@@ -21,9 +21,6 @@ export default class User extends ReadModel<UserProjector>
     }
 
     async findOne(query: z.infer<this['schemaRegistry']['findOne']>) {
-        const result = await this.store.tables.users.find(query);
-        if(!result.length)
-            return null;
-        return result[0];
+        return await this.store.tables.users.findOne(query);
     }
 }

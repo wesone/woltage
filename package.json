@@ -1,7 +1,7 @@
 {
   "name": "woltage-monorepo",
   "version": "1.0.0",
-  "description": "",
+  "description": "Woltage - A CQRS and Event-Sourcing Framework",
   "license": "ISC",
   "author": "wesone",
   "private": true,

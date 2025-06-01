@@ -1,13 +1,13 @@
 import type Event from '../Event.ts';
 import EventRegistry from '../EventRegistry.ts';
 import emit from '../write/emit.ts';
-import type {IStore, DefinitionMap} from '../adapters/Store.ts';
+import type {IStore, TableDefinitionMap} from '../adapters/Store.ts';
 
-class Projector<Definitions extends DefinitionMap>
+class Projector<Definitions extends TableDefinitionMap>
 {
     declare ['constructor']: typeof Projector;
 
-    static schema: DefinitionMap;
+    static schema: TableDefinitionMap;
     static version: number;
 
     #registry: EventRegistry;

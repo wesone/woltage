@@ -19,27 +19,27 @@ export type WoltageConfig = {
     /**
      * An array of event classes or a path to a directory to import event classes from.
      *
-     * Important: if the directory (or a subdirectory) contains other modules these modules will be imported too which could lead to side effects.
+     * Important: if the directory (or a subdirectory) contains other modules, these modules will be imported too which could lead to side effects.
      */
     eventClasses: (typeof Event)[] | string
     /**
      * An array of aggregate instances or a path to a directory to import aggregates from.
      *
-     * Important: if the directory (or a subdirectory) contains other modules these modules will be imported too which could lead to side effects.
+     * Important: if the directory (or a subdirectory) contains other modules, these modules will be imported too which could lead to side effects.
      */
     aggregates: Aggregate[] | string,
     /**
      * An array of projector classes or a path to a directory to import projector classes from.
      *
-     * Important: if the directory (or a subdirectory) contains other modules these modules will be imported too which could lead to side effects.
+     * Important: if the directory (or a subdirectory) contains other modules, these modules will be imported too which could lead to side effects.
      */
     projectorClasses: (typeof Projector)[] | string,
     /**
      * An array of read model classes or a path to a directory to import read model classes from.
      *
-     * Important: if the directory (or a subdirectory) contains other modules these modules will be imported too which could lead to side effects.
+     * Important: if the directory (or a subdirectory) contains other modules, these modules will be imported too which could lead to side effects.
      */
-    readModelClasses: (typeof ReadModel)[] | string,
+    readModelClasses?: (typeof ReadModel)[] | string,
     /**
      * A store adapter that is used to store internal data.
      */
