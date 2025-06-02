@@ -27,7 +27,7 @@ type CommandContext = {
     aggregateId: string
 };
 
-type Command<TState, TPayload extends z.ZodTypeAny = any> = (state: TState, payload: z.infer<TPayload>, context: CommandContext) => Promise<Event | Event[] | void> | Event | Event[] | void;
+type Command<TState, TPayload extends z.ZodType = any> = (state: TState, payload: z.infer<TPayload>, context: CommandContext) => Promise<Event | Event[] | void> | Event | Event[] | void;
 
 class Aggregate<TState = any>
 {
@@ -40,7 +40,7 @@ class Aggregate<TState = any>
     name: string;
     projector: AggregateProjector<TState>;
     #registry: EventRegistry;
-    #commands: {[commandName: string]: {schema: z.ZodTypeAny, command: Command<TState>}} = {};
+    #commands: {[commandName: string]: {schema: z.ZodType, command: Command<TState>}} = {};
 
     private constructor(name: string, projector: AggregateProjector<TState>) {
         this.name = name;
@@ -49,7 +49,7 @@ class Aggregate<TState = any>
     }
 
     registerCommand(command: Command<TState>, commandName?: string): void;
-    registerCommand<TPayload extends z.ZodTypeAny = any>(schema: TPayload, command: Command<TState, TPayload>, commandName?: string): void;
+    registerCommand<TPayload extends z.ZodType = any>(schema: TPayload, command: Command<TState, TPayload>, commandName?: string): void;
     registerCommand(schema: any, command: any, commandName?: any) {
         if(typeof schema === 'function')
         {

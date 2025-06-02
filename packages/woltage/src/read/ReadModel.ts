@@ -34,7 +34,7 @@ abstract class ReadModel<TProjector extends Projector<any> = any>
      * The key must be the name of one of the handler functions and the value is the schema.
      * The query parameter that will be passed to the handler function will be validated automatically.
      */
-    readonly schemaRegistry: Partial<Record<string, z.ZodTypeAny>> = {};
+    readonly schemaRegistry: Partial<Record<string, z.ZodType>> = {};
 
     get store(): TProjector['store'] {
         const projectionMap = executionStorage.getStore()?.projectionMap;

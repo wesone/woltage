@@ -41,7 +41,7 @@ export default class EventCaster
         return event;
     }
 
-    static isCastable(/* castingDirection: (typeof this.CASTING_DIRECTIONS)[keyof typeof this.CASTING_DIRECTIONS], sourceCodec: z.ZodTypeAny, targetCodec: z.ZodTypeAny, path: string[] = [], isOptional: boolean = false */) {
+    static isCastable(/* castingDirection: (typeof this.CASTING_DIRECTIONS)[keyof typeof this.CASTING_DIRECTIONS], sourceCodec: z.ZodType, targetCodec: z.ZodType, path: string[] = [], isOptional: boolean = false */) {
         /*
           +–––––––––––––––––––––+––––––––––––––––––––––––––––––+–––––––––––––––––––––––––––––––+–––––––––––––––––––––-––––––––+
           | Field is            |    Field will be deleted     |      Field will be added      |   Field's type will change   |

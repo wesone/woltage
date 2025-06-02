@@ -210,7 +210,7 @@ type TMeta = {
     userId: string
 };
 
-export default class Event<TPayload extends z.ZodTypeAny> extends WoltageEvent<TPayload, TMeta>
+export default class Event<TPayload extends z.ZodType> extends WoltageEvent<TPayload, TMeta>
 {
     constructor(data: EventConstructionData<TPayload, TMeta>, shouldValidate?: boolean) {
         if(!data.meta)

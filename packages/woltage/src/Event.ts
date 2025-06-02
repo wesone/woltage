@@ -3,13 +3,13 @@ import {z} from 'zod/v4';
 import {projectionStorage} from './localStorages.ts';
 import {getEventClass} from './eventMap.ts';
 
-type NewEventData<TPayload extends z.ZodTypeAny, TMeta = any> = {
+type NewEventData<TPayload extends z.ZodType, TMeta = any> = {
     aggregateId?: string,
     payload: z.infer<TPayload>,
     meta?: TMeta
 };
 
-type EventData<TPayload extends z.ZodTypeAny, TMeta = any> = NewEventData<TPayload> & {
+type EventData<TPayload extends z.ZodType, TMeta = any> = NewEventData<TPayload> & {
     id: string,
     type: string,
     version: number,
@@ -21,14 +21,14 @@ type EventData<TPayload extends z.ZodTypeAny, TMeta = any> = NewEventData<TPaylo
     position: bigint
 };
 
-export type EventConstructionData<TPayload extends z.ZodTypeAny, TMeta = any> = EventData<TPayload, TMeta> | NewEventData<TPayload, TMeta>;
+export type EventConstructionData<TPayload extends z.ZodType, TMeta = any> = EventData<TPayload, TMeta> | NewEventData<TPayload, TMeta>;
 
 export type EventIdentity = {
     type: string,
     version: number,
 }
 
-export default class Event<TPayload extends z.ZodTypeAny = any, TMeta = any> implements EventData<TPayload, TMeta>
+export default class Event<TPayload extends z.ZodType = any, TMeta = any> implements EventData<TPayload, TMeta>
 {
     /**
      * @see https://github.com/Microsoft/TypeScript/issues/3841#issuecomment-337560146
@@ -36,7 +36,7 @@ export default class Event<TPayload extends z.ZodTypeAny = any, TMeta = any> imp
      */
     declare ['constructor']: typeof Event;
 
-    static schema: z.ZodTypeAny = z.any();
+    static schema: z.ZodType = z.any();
     static version: number = -1;
 
     static toString() {
