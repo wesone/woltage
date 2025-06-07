@@ -1,0 +1,31 @@
+{
+  "name": "@woltage/store-postgres",
+  "version": "1.0.0",
+  "description": "PostgreSQL adapter for Woltage",
+  "license": "ISC",
+  "author": "wesone",
+  "type": "module",
+  "main": "dist/index.js",
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/wesone/woltage.git"
+  },
+  "homepage": "https://github.com/wesone/woltage",
+  "scripts": {
+    "build": "npx tsc -p tsconfig.json",
+    "test": "node --test --experimental-test-coverage './test/**/*.test.*'",
+    "test-watch": "node --watch --test './test/**/*.test.*'",
+    "prepack": "npm run build"
+  },
+  "peerDependencies": {
+    "pg": "^8.16.0",
+    "woltage": "^1.0.2"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.15.4",
+    "typescript": "^5.8.3"
+  },
+  "files": [
+    "/dist"
+  ]
+}

@@ -598,7 +598,7 @@ export default class User extends ReadModel<UserProjector>
 
 ### Handler
 
-A read model handler function is simply a method of the read model class. I can have any parameters and may return any value.
+A read model handler function is simply a method of the read model class. It can have any parameters and may return any value.
 
 However, if you want to call the handler via [`woltage.executeQuery`](#executequery), it will receive a `query` parameter and a `context` parameter. 
 

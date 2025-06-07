@@ -14,9 +14,10 @@ class Table<Def extends TableDefinition> implements ITable<Def> {
         return new Proxy(this, {
             get(target, prop, receiver) {
                 const ownProperty = Reflect.get(target, prop, receiver);
-                if(ownProperty !== undefined)
-                    return ownProperty;
-                return Reflect.get(target.client, prop, receiver);
+                const property = ownProperty ?? Reflect.get(target.client, prop, receiver);
+                if(typeof property === 'function')
+                    return property.bind(ownProperty !== undefined ? target : target.client);
+                return property;
             }
         });
     }

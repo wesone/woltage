@@ -187,11 +187,11 @@ class Woltage
     async #createProjection(projectionName: string, projectionVersion: number, projectorName: string, projectorVersion: number, storeName: string) {
         const projectionId = Projection.getId(projectionName, projectionVersion);
         if(this.#projections.get(projectionId))
-            throw new ConflictError('Projection already exists.');
+            throw new ConflictError('Projection already exists');
 
         const ProjectorClass = this.#projectorMap[projectorName]?.[projectorVersion];
         if(!ProjectorClass)
-            throw new NotFoundError(`Projector '${projectorName}@${projectorVersion}' not found.`);
+            throw new NotFoundError(`Projector '${projectorName}@${projectorVersion}' not found`);
         const store = this.#getStore(storeName, projectionId);
 
         const projection = new Projection(projectionName, projectionVersion, ProjectorClass, store);
