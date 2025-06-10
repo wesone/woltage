@@ -1,6 +1,6 @@
 {
   "name": "woltage",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "A CQRS and Event-Sourcing Framework",
   "license": "ISC",
   "author": "wesone",

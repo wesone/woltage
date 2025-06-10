@@ -1,6 +1,6 @@
 {
   "name": "@woltage/store-postgres",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "PostgreSQL adapter for Woltage",
   "license": "ISC",
   "author": "wesone",
@@ -19,7 +19,7 @@
   },
   "peerDependencies": {
     "pg": "^8.16.0",
-    "woltage": "^1.0.2"
+    "woltage": "^1.0.3"
   },
   "devDependencies": {
     "@types/pg": "^8.15.4",
