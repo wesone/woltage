@@ -1,5 +1,5 @@
+import {z} from 'woltage';
 import Event from '../../Event.ts';
-import {z} from 'zod/v4';
 import {AVAILABLE_ROLES} from '../../ACL.ts';
 
 const schema = z.object({

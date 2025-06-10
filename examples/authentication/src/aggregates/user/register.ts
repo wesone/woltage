@@ -1,6 +1,5 @@
 import A from './_Aggregate.ts';
-import {z} from 'zod/v4';
-import {ConflictError, DuplicateAggregateError} from 'woltage';
+import {ConflictError, DuplicateAggregateError, z} from 'woltage';
 import {generatePasswordHash} from '../../utils/password.ts';
 import UserRegistered from '../../events/user/UserRegistered.ts';
 import User from '../../readModels/User.ts';

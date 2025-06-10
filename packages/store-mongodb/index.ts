@@ -25,7 +25,7 @@ class Table<Def extends TableDefinition> implements ITable<Def> {
     }
 
     get(key: TableKey<Def>) {
-        return this.collection.findOne(key, {projection: {_id: 0}});
+        return this.collection.findOne(key, {projection: {_id: 0}}) as Promise<TableEntry<Def> | null>;
     }
 
     async update(key: TableKey<Def>, values: TablePartialEntry<Def>) {

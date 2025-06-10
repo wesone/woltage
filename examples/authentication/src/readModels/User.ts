@@ -1,6 +1,5 @@
-import {ReadModel} from 'woltage';
+import {ReadModel, z} from 'woltage';
 import type UserProjector from '../projectors/UserProjector.ts';
-import {z} from 'zod/v4';
 
 export default class User extends ReadModel<UserProjector>
 {

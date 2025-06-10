@@ -1,6 +1,5 @@
 import A from './_Aggregate.ts';
-import {z} from 'zod/v4';
-import {NotFoundError, UnalteredError} from 'woltage';
+import {NotFoundError, UnalteredError, z} from 'woltage';
 import {AVAILABLE_ROLES} from '../../ACL.ts';
 import UserRoleAdded from '../../events/user/UserRoleAdded.ts';
 

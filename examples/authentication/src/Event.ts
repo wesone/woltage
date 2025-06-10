@@ -1,5 +1,4 @@
-import {Event as WoltageEvent, type EventConstructionData} from 'woltage';
-import type {z} from 'zod/v4';
+import {Event as WoltageEvent, type EventConstructionData, type z} from 'woltage';
 import apiStorage from './api/apiStorage.ts';
 
 type TMeta = {

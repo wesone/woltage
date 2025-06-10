@@ -38,7 +38,7 @@ class Table<Def extends TableDefinition> implements ITable<Def> {
             SELECT * FROM ${this.#store.escapeField(this.name)}
             WHERE ${Object.keys(key).map((k, i) => `${this.#store.escapeField(k)} = $${i + 1}`).join(' AND ')};
         `, Object.values(key));
-        return result.rows[0] ?? null;
+        return (result.rows[0] ?? null) as TableEntry<Def> | null;
     }
 
     async update(key: TableKey<Def>, updateValues: TablePartialEntry<Def>) {

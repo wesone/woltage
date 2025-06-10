@@ -1,5 +1,5 @@
+import {z} from 'woltage';
 import Event from '../../Event.ts';
-import {z} from 'zod/v4';
 
 const schema = z.object({
     email: z.email(),

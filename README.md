@@ -635,6 +635,8 @@ To execute a [command](#command) of an aggregate. If the optional `context` para
 
 `async executeQuery(readModelName: string, handlerName: string, query: any, context?: any): Promise<any>`
 
+`async executeQuery(readModel: typeof ReadModel, handlerName: string, query: any, context?: any): Promise<any>`
+
 To execute a [read model handler](#handler). If the optional `context` parameter was provided, it will be added to the context parameter of the read model handler.
 
 ### addProjection

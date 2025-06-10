@@ -1,6 +1,5 @@
-import {z} from 'zod/v4';
+import {validate, z} from 'woltage';
 import type {APIHandler} from '../../server.ts';
-import {validate} from 'woltage';
 
 export default {
     method: 'delete',

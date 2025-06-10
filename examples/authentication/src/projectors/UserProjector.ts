@@ -1,5 +1,4 @@
-import {z} from 'zod/v4';
-import {Projector} from 'woltage';
+import {Projector, z} from 'woltage';
 import type MongoDBStore from '@woltage/store-mongodb';
 import UserRegistered from '../events/user/UserRegistered.ts';
 import {ROLES, AVAILABLE_ROLES} from '../ACL.ts';

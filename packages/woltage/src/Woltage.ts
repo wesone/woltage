@@ -244,7 +244,19 @@ class Woltage
         await this.#execute(() => aggregate.executeCommand(aggregateId, commandName, payload), context);
     }
 
-    async executeQuery(readModelName: string, handlerName: string, query: any, context?: any) {
+    async executeQuery<
+        TClass extends typeof ReadModel,
+        THandler extends keyof InstanceType<TClass>
+    >(
+        readModel: TClass,
+        handlerName: THandler,
+        query: InstanceType<TClass>[THandler] extends (...args: any) => any ? Parameters<InstanceType<TClass>[THandler]>[0] : any,
+        context?: any
+    ): Promise<InstanceType<TClass>[THandler] extends (...args: any) => any ? ReturnType<InstanceType<TClass>[THandler]> : InstanceType<TClass>[THandler]>;
+    async executeQuery(readModelName: string, handlerName: string, query: any, context?: any): Promise<unknown>;
+    async executeQuery(readModelName: any, handlerName: string, query: any, context?: any) {
+        if(typeof readModelName !== 'string')
+            readModelName = readModelName.toString();
         const readModel = this.#readModelMap[ReadModel.getName(readModelName)];
         if(!readModel)
             throw new NotFoundError(`Read model '${readModelName}' not found.`);
