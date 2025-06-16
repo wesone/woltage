@@ -4,6 +4,7 @@ import createServer from './api/server.ts';
 import addProjections from './defaultProjections.ts';
 import {ROLES} from './ACL.ts';
 import KurrentDBEventStore from '@woltage/eventstore-kurrentdb';
+import UserAggregate from './aggregates/user/_Aggregate.ts';
 
 // init woltage
 const woltage = await createWoltage({
@@ -30,8 +31,8 @@ const adminUser = {
     lastName: 'Stevenson',
     password: '1234'
 };
-await woltage.executeCommand('user', adminUser.id, 'register', adminUser)
-    .then(() => woltage.executeCommand('user', adminUser.id, 'addRole', {role: ROLES.ADMIN}))
+await woltage.executeCommand(UserAggregate, adminUser.id, 'register', adminUser)
+    .then(() => woltage.executeCommand(UserAggregate, adminUser.id, 'addRole', {role: ROLES.ADMIN}))
     // the user may already exists
     .catch(() => { });
 

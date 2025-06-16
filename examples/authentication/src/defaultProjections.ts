@@ -1,5 +1,6 @@
 import type {Woltage} from 'woltage';
 import stores from './stores.ts';
+import UserProjector from './projectors/UserProjector.ts';
 
 type DefaultProjectionDefinition = {
     version: number,
@@ -9,7 +10,7 @@ type DefaultProjectionDefinition = {
 }
 
 const defaultProjections: Record<string, DefaultProjectionDefinition> = {
-    user: {version: 1, projectorName: 'UserProjector', projectorVersion: 1, adapter: 'mongo'},
+    user: {version: 1, projectorName: UserProjector.name, projectorVersion: UserProjector.version, adapter: 'mongo'},
 };
 
 export default async (woltage: Woltage) => {

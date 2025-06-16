@@ -25,6 +25,7 @@ type AggregateProjector<TState = any> = {
 
 type CommandContext = {
     aggregateId: string
+    aggregateVersion: number
 };
 
 type Command<TState, TPayload extends z.ZodType = any> = (state: TState, payload: z.infer<TPayload>, context: CommandContext) => Promise<Event | Event[] | void> | Event | Event[] | void;
@@ -71,12 +72,14 @@ class Aggregate<TState = any>
         const status = {
             state: (this.projector.$init?.() ?? {}) as TState,
             revision: STATE_NEW as AppendRevision,
+            version: 0
         };
         try
         {
             for await (const event of events)
             {
                 status.revision = event.position;
+                status.version++;
                 const {event: transformedEvent, handler = this.projector.$all} = await this.#registry.get(event);
                 status.state = handler?.(status.state, transformedEvent) ?? status.state;
             }
@@ -97,10 +100,11 @@ class Aggregate<TState = any>
         const {schema, command} = this.#commands[commandName];
         payload = validate(schema, payload);
 
-        const {state, revision} = await this.#getStatus(aggregateId);
+        const {state, revision, version: aggregateVersion} = await this.#getStatus(aggregateId);
         const context = Object.freeze({
             ...(executionStorage.getStore()?.context ?? {}),
-            aggregateId
+            aggregateId,
+            aggregateVersion
         });
         let events = await command(state, payload, context);
         if(!events)

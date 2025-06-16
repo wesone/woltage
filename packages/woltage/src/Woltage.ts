@@ -237,7 +237,11 @@ class Woltage
         );
     }
 
-    async executeCommand(aggregateName: string, aggregateId: string, commandName: string, payload: any, context?: any) {
+    async executeCommand(aggregate: Aggregate, aggregateId: string, commandName: string, payload: any, context?: any): Promise<any>
+    async executeCommand(aggregateName: string, aggregateId: string, commandName: string, payload: any, context?: any): Promise<any>
+    async executeCommand(aggregateName: Aggregate | string, aggregateId: string, commandName: string, payload: any, context?: any) {
+        if(typeof aggregateName !== 'string')
+            aggregateName = aggregateName.name;
         const aggregate = this.#aggregateMap[aggregateName];
         if(!aggregate)
             throw new NotFoundError(`Aggregate '${aggregateName}' not found.`);
@@ -250,11 +254,11 @@ class Woltage
     >(
         readModel: TClass,
         handlerName: THandler,
-        query: InstanceType<TClass>[THandler] extends (...args: any) => any ? Parameters<InstanceType<TClass>[THandler]>[0] : any,
+        query: InstanceType<TClass>[THandler] extends (...args: any) => any ? Parameters<InstanceType<TClass>[THandler]>[0] : never,
         context?: any
-    ): Promise<InstanceType<TClass>[THandler] extends (...args: any) => any ? ReturnType<InstanceType<TClass>[THandler]> : InstanceType<TClass>[THandler]>;
+    ): Promise<InstanceType<TClass>[THandler] extends (...args: any) => any ? ReturnType<InstanceType<TClass>[THandler]> : never>;
     async executeQuery(readModelName: string, handlerName: string, query: any, context?: any): Promise<unknown>;
-    async executeQuery(readModelName: any, handlerName: string, query: any, context?: any) {
+    async executeQuery(readModelName: ReadModel | string, handlerName: string, query: any, context?: any) {
         if(typeof readModelName !== 'string')
             readModelName = readModelName.toString();
         const readModel = this.#readModelMap[ReadModel.getName(readModelName)];
