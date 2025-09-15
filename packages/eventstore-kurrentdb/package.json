@@ -1,6 +1,6 @@
 {
   "name": "@woltage/eventstore-kurrentdb",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "KurrentDB adapter for Woltage",
   "license": "ISC",
   "author": "wesone",
