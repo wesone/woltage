@@ -217,8 +217,8 @@ export default class KurrentDBEventStore implements IEventStore
             : undefined;
 
         const events = this.#client.readAll({
-            fromPosition: END,
-            direction: BACKWARDS,
+            fromPosition: KURRENT_END,
+            direction: KURRENT_BACKWARDS,
             maxCount: 1,
             filter: kurrentFilter
         });

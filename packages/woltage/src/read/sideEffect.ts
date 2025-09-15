@@ -6,10 +6,10 @@ export default function sideEffect<TArg>(fn: SideEffectFn<TArg>): SideEffectFn<T
 {
     return async arg => {
         const store = projectionStorage.getStore();
-        if(store?.isReplaying === false)
-            await fn(arg);
-        else if(store === undefined)
+        if(store === undefined)
             console.trace(`Invalid side effect execution "${fn.toString()}".`, 'Executing side effects is only possible from event handlers in projections.');
+        else if(store.isReplaying === false)
+            await fn(arg);
         return Promise.resolve();
     };
 }

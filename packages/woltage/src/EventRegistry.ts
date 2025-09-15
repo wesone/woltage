@@ -21,10 +21,19 @@ export default class EventRegistry
         this.#handlerMap = Object.getOwnPropertyNames(proto ?? obj)
             .filter(property => property.startsWith('{') && property.endsWith('}'))
             .reduce((map, eventIdentity) => {
-                const {type, version} = JSON.parse(eventIdentity) as EventIdentity;
-                map[type] ??= {};
-                map[type][version] = obj[eventIdentity].bind(obj);
-                return map;
+                try
+                {
+                    const {type, version} = JSON.parse(eventIdentity) as EventIdentity;
+                    if(type.length && !isNaN(version))
+                    {
+                        map[type] ??= {};
+                        map[type][version] = obj[eventIdentity].bind(obj);
+                    }
+                }
+                finally
+                {
+                    return map;
+                }
             }, {} as HandlerMap);
     }
 
@@ -34,8 +43,9 @@ export default class EventRegistry
 
     async get(event: Event): Promise<{event: Event, handler: Function | undefined }> {
         const handlers = this.#handlerMap[event.type];
-        const handler = handlers?.[event.version];
+        let handler = handlers?.[event.version];
         if(handlers && !handler)
+        {
             event = await EventCaster.cast(
                 event,
                 Object.keys(handlers)
@@ -43,6 +53,8 @@ export default class EventRegistry
                     .sort((a, b) => b - a)
                     [0]
             );
+            handler = handlers[event.version];
+        }
         return {
             event,
             handler

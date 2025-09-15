@@ -326,7 +326,7 @@ orderAggregate.registerCommand(
 
 ### Aggregate Projector
 
-Whenever a [command](#command) is executed, the current state of the aggregate is calculated and passed to the command. How the state should look is defined by an aggregate projector. It acts like a reducer that reduces all events of the requested aggregate ID to a state.
+Whenever a [command](#command) is executed, the current state of the requested aggregate stream is calculated and passed to the command. How the state should look is defined by an aggregate projector. It acts like a reducer that reduces all events of the requested aggregate ID to a state.
 
 It can have the following properties:
 Property | Type | Description
@@ -337,7 +337,7 @@ $all? | `(state: any, event: Event) => any` | This function will be called for e
 
 ### Command
 
-A command is the instruction to the system to change an aggregate's state. It decides if an event (or events) should be created or not and it will receive the [aggregate's state](#aggregate-projector) to make that decision.
+A command is the instruction to the system to change an aggregate stream's state. It decides if an event (or events) should be created or not and it will receive the [aggregate's state](#aggregate-projector) to make that decision.
 
 To register a command use the `registerCommand` method of the aggregate.
 - You can pass a [Zod](https://zod.dev/) schema along with the command handler to automatically validate the command payload.
@@ -351,7 +351,7 @@ The command handler has the form:
 
 ### Using Read Models
 
-In case the state that will be passed to the command handler is not sufficient (maybe the command handler needs to read from a different aggregate), you can call read models inside the command handler.
+In case the state that will be passed to the command handler is not sufficient (maybe the command handler needs to read from a different aggregate stream), you can call read models inside the command handler.
 ```typescript
 import {z, ConflictError, DuplicateAggregateError} from 'woltage';
 import userAggregate from './userAggregate.ts';
@@ -628,6 +628,8 @@ A store adapter needs to implement the `IStore` interface but can have additiona
 ### executeCommand
 
 `async executeCommand(aggregateName: string, aggregateId: string, commandName: string, payload: any, context?: any): Promise<void>`
+
+`async executeCommand(aggregate: Aggregate, aggregateId: string, commandName: string, payload: any, context?: any): Promise<void>`
 
 To execute a [command](#command) of an aggregate. If the optional `context` parameter was provided, it will be added to the context parameter of the command.
 

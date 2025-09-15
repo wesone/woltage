@@ -1,10 +1,11 @@
 import {describe, it, mock, after} from 'node:test';
 import assert from 'node:assert/strict';
 
-import Aggregate from '../src/write/Aggregate.ts';
-import mockEventStore from './_mock/mockEventStore.ts';
-import mockEventClass from './_mock/mockEventClass.ts';
-import {STATE_NEW} from '../src/adapters/EventStore.ts';
+import Aggregate from '../../src/write/Aggregate.ts';
+import mockEventStore from '../_mock/mockEventStore.ts';
+import mockEventClass from '../_mock/mockEventClass.ts';
+import {STATE_NEW} from '../../src/adapters/EventStore.ts';
+import {z} from 'zod/v4';
 
 describe('Aggregate', async () => {
     after(() => mock.reset());
@@ -24,7 +25,7 @@ describe('Aggregate', async () => {
 
         const aggregateId = 'a';
         const commandPayload = {cmd: 42};
-        const context = {aggregateId};
+        const context = {aggregateId, aggregateVersion: 0};
         const execCommand = () => aggregate.executeCommand(aggregateId, command.name, commandPayload);
 
         // reject as command is currently not known
@@ -44,7 +45,7 @@ describe('Aggregate', async () => {
         const cmd = () => {};
         assert.doesNotThrow(() => aggregate.registerCommand(cmd));
         assert.throws(() => aggregate.registerCommand(() => {}));
-        assert.doesNotThrow(() => aggregate.registerCommand(() => {}, 'testcommand'));
+        assert.doesNotThrow(() => aggregate.registerCommand(() => {}, {commandName: 'testcommand'}));
     });
 
     await it('prevents registering commands with the same name', async () => {
@@ -52,7 +53,7 @@ describe('Aggregate', async () => {
         assert.doesNotThrow(() => aggregate.registerCommand(function doSomething() {}));
         assert.doesNotThrow(() => aggregate.registerCommand(function doSomethingElse() {}));
         assert.throws(() => aggregate.registerCommand(function doSomething() {}));
-        assert.throws(() => aggregate.registerCommand(() => {}, 'doSomethingElse'));
+        assert.throws(() => aggregate.registerCommand(() => {}, {commandName: 'doSomethingElse'}));
     });
 
     await it('constructs aggregate state for commands', async () => {
@@ -102,8 +103,8 @@ describe('Aggregate', async () => {
             eventCount: 2,
             name: 'Airplane'
         };
-        assert.deepStrictEqual(command.mock.calls[0].arguments, [expectedState1, {}, {aggregateId: aggregateId1}]);
-        assert.deepStrictEqual(command.mock.calls[1].arguments, [expectedState2, {}, {aggregateId: aggregateId2}]);
+        assert.deepStrictEqual(command.mock.calls[0].arguments, [expectedState1, {}, {aggregateId: aggregateId1, aggregateVersion: 2}]);
+        assert.deepStrictEqual(command.mock.calls[1].arguments, [expectedState2, {}, {aggregateId: aggregateId2, aggregateVersion: 2}]);
     });
 
     await it('does not swallow exceptions that occur in aggregate projector', async () => {
@@ -171,6 +172,22 @@ describe('Aggregate', async () => {
             assert.strictEqual(EventStore.append.mock.callCount(), 3);
             assert.strictEqual(results.filter(({status}) => status === 'fulfilled').length, 2);
             assert.strictEqual(results.filter(({status}) => status === 'rejected').length, 1);
+        });
+
+        await it('validate payload against schema', async () => {
+            const aggregate = Aggregate.create('test', {});
+            const command = () => {};
+            aggregate.registerCommand(
+                z.object({
+                    num: z.number(),
+                }),
+                command
+            );
+            const aggregateId = 'fourtytwo';
+
+            await assert.rejects(() => aggregate.executeCommand(aggregateId, command.name, {}));
+            await assert.rejects(() => aggregate.executeCommand(aggregateId, command.name, {num: '42'}));
+            await assert.doesNotReject(() => aggregate.executeCommand(aggregateId, command.name, {num: 42}));
         });
     });
 });

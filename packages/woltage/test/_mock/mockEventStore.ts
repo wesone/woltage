@@ -1,4 +1,4 @@
-import {mock} from 'node:test';
+import {type Mock, mock} from 'node:test';
 import EventStore from '../../src/EventStore.ts';
 import {type AppendRevision, STATE_NEW} from '../../src/adapters/EventStore.ts';
 import type Event from '../../src/Event.ts';
@@ -49,5 +49,5 @@ export default (existingEvents: {[aggregateName: string]: Event[]} = {}) => {
             return Promise.resolve();
         }
     );
-    return EventStore;
+    return EventStore as typeof EventStore & {append: Mock<typeof EventStore.append>, read: Mock<typeof EventStore.read>};
 };

@@ -30,6 +30,14 @@ type CommandContext = {
 
 type Command<TState, TPayload extends z.ZodType = any> = (state: TState, payload: z.infer<TPayload>, context: CommandContext) => Promise<Event | Event[] | void> | Event | Event[] | void;
 
+type CommandOptions = {
+    /**
+     * The name of the command.
+     * Set this if the command function has no name or if you want to override it's name.
+     */
+    commandName?: string,
+};
+
 class Aggregate<TState = any>
 {
     declare ['constructor']: typeof Aggregate;
@@ -41,7 +49,7 @@ class Aggregate<TState = any>
     name: string;
     projector: AggregateProjector<TState>;
     #registry: EventRegistry;
-    #commands: {[commandName: string]: {schema: z.ZodType, command: Command<TState>}} = {};
+    #commands: {[commandName: string]: {schema: z.ZodType, command: Command<TState>, options: CommandOptions}} = {};
 
     private constructor(name: string, projector: AggregateProjector<TState>) {
         this.name = name;
@@ -49,22 +57,23 @@ class Aggregate<TState = any>
         this.#registry = new EventRegistry(projector);
     }
 
-    registerCommand(command: Command<TState>, commandName?: string): void;
-    registerCommand<TPayload extends z.ZodType = any>(schema: TPayload, command: Command<TState, TPayload>, commandName?: string): void;
-    registerCommand(schema: any, command: any, commandName?: any) {
+    registerCommand(command: Command<TState>, options?: CommandOptions): void;
+    registerCommand<TPayload extends z.ZodType = any>(schema: TPayload, command: Command<TState, TPayload>, options?: CommandOptions): void;
+    registerCommand(schema: any, command: any, options?: any) {
         if(typeof schema === 'function')
         {
-            commandName = command;
+            options = command;
             command = schema;
             schema = z.any();
         }
+        options ??= {};
 
-        commandName = commandName ?? command.name;
+        const commandName = options.commandName ?? command.name;
         if(!commandName.length)
-            throw new Error('Command has no name. Provide a named function or the commandName argument to registerCommand.');
+            throw new Error('Command has no name. Provide a named function or options.commandName to registerCommand.');
         if(this.#commands[commandName])
             throw new Error(`Command '${commandName}' already exists in aggregate '${this.name}'.`);
-        this.#commands[commandName] = {schema, command};
+        this.#commands[commandName] = {schema, command, options};
     }
 
     async #getStatus(aggregateId: string) {
@@ -97,7 +106,7 @@ class Aggregate<TState = any>
         if(!this.#commands[commandName])
             throw new NotFoundError(`Command ${commandName} not found for aggregate ${this.name}.`);
 
-        const {schema, command} = this.#commands[commandName];
+        const {schema, command/* , options */} = this.#commands[commandName];
         payload = validate(schema, payload);
 
         const {state, revision, version: aggregateVersion} = await this.#getStatus(aggregateId);
