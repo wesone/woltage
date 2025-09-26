@@ -1,17 +1,13 @@
 import createWoltage from 'woltage';
-import stores from './stores.ts';
+import stores, {eventStore} from './stores.ts';
 import createServer from './api/server.ts';
 import addProjections from './defaultProjections.ts';
 import {ROLES} from './ACL.ts';
-import KurrentDBEventStore from '@woltage/eventstore-kurrentdb';
 import UserAggregate from './aggregates/user/_Aggregate.ts';
 
 // init woltage
 const woltage = await createWoltage({
-    eventStore: {
-        adapter: KurrentDBEventStore,
-        args: [process.env.KURRENT_CONNECTION_STRING!]
-    },
+    eventStore,
     eventClasses: import.meta.dirname + '/events',
     aggregates: import.meta.dirname + '/aggregates',
     projectorClasses: import.meta.dirname + '/projectors',
@@ -34,7 +30,7 @@ const adminUser = {
 await woltage.executeCommand(UserAggregate, adminUser.id, 'register', adminUser)
     .then(() => woltage.executeCommand(UserAggregate, adminUser.id, 'addRole', {role: ROLES.ADMIN}))
     // the user may already exists
-    .catch(() => { });
+    .catch(() => {});
 
 // start the api
 const {server} = await createServer({port: 3000}, woltage);

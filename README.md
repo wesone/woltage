@@ -342,6 +342,7 @@ A command is the instruction to the system to change an aggregate stream's state
 To register a command use the `registerCommand` method of the aggregate.
 - You can pass a [Zod](https://zod.dev/) schema along with the command handler to automatically validate the command payload.
 - The name of the command is simply the name of the function, that you pass as command handler. You can alternatively pass a command name if the command handler is an anonymous function or if you just want to use a different name.
+- The `registerCommand` method will return an object with the command's info (e.g. the `name`, `schema`, ...)
 
 The command handler has the form:
 

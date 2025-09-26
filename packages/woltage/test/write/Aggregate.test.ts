@@ -56,6 +56,18 @@ describe('Aggregate', async () => {
         assert.throws(() => aggregate.registerCommand(() => {}, {commandName: 'doSomethingElse'}));
     });
 
+    await it('returns command infos after registering', async () => {
+        const aggregate = Aggregate.create('test', {});
+        const schema = z.any();
+        const command = function doSomething() {};
+        assert.deepEqual(aggregate.registerCommand(schema, command), {
+            name: command.name,
+            schema,
+            command,
+            options: {}
+        });
+    });
+
     await it('constructs aggregate state for commands', async () => {
         const aggregateName = 'test';
         const PetRegisteredEvent = mockEventClass('pet.registered');

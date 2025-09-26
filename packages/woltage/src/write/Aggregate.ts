@@ -38,6 +38,13 @@ type CommandOptions = {
     commandName?: string,
 };
 
+type CommandInfo<TState, TPayload extends z.ZodType = any> = {
+    name: string
+    schema: TPayload,
+    command: Command<TState, TPayload>,
+    options: CommandOptions
+}
+
 class Aggregate<TState = any>
 {
     declare ['constructor']: typeof Aggregate;
@@ -57,8 +64,8 @@ class Aggregate<TState = any>
         this.#registry = new EventRegistry(projector);
     }
 
-    registerCommand(command: Command<TState>, options?: CommandOptions): void;
-    registerCommand<TPayload extends z.ZodType = any>(schema: TPayload, command: Command<TState, TPayload>, options?: CommandOptions): void;
+    registerCommand(command: Command<TState>, options?: CommandOptions): CommandInfo<TState>;
+    registerCommand<TPayload extends z.ZodType = any>(schema: TPayload, command: Command<TState, TPayload>, options?: CommandOptions): CommandInfo<TState, TPayload>;
     registerCommand(schema: any, command: any, options?: any) {
         if(typeof schema === 'function')
         {
@@ -74,6 +81,12 @@ class Aggregate<TState = any>
         if(this.#commands[commandName])
             throw new Error(`Command '${commandName}' already exists in aggregate '${this.name}'.`);
         this.#commands[commandName] = {schema, command, options};
+        return {
+            name: commandName,
+            schema,
+            command,
+            options
+        };
     }
 
     async #getStatus(aggregateId: string) {
