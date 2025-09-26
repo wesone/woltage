@@ -1,7 +1,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
-import Aggregate from './write/Aggregate.ts';
+import Aggregate, {type CommandInfo} from './write/Aggregate.ts';
 import EventStore from './EventStore.ts';
 import Event from './Event.ts';
 import {registerEventClasses} from './eventMap.ts';
@@ -237,11 +237,23 @@ class Woltage
         );
     }
 
+    async executeCommand<TState, TPayload extends z.ZodType = any>(commandInfo: CommandInfo<TState, TPayload>, aggregateId: string, payload: any, context?: any): Promise<any>
     async executeCommand(aggregate: Aggregate, aggregateId: string, commandName: string, payload: any, context?: any): Promise<any>
     async executeCommand(aggregateName: string, aggregateId: string, commandName: string, payload: any, context?: any): Promise<any>
-    async executeCommand(aggregateName: Aggregate | string, aggregateId: string, commandName: string, payload: any, context?: any) {
+    async executeCommand(aggregateName: string | Aggregate | CommandInfo<any>, aggregateId: string, commandName: string, payload: any, context?: any) {
         if(typeof aggregateName !== 'string')
-            aggregateName = aggregateName.name;
+        {
+            if('aggregate' in aggregateName) // CommandInfo
+            {
+                const commandInfo = aggregateName;
+                context = payload;
+                payload = commandName;
+                commandName = commandInfo.name;
+                aggregateName = commandInfo.aggregate.name;
+            }
+            else // Aggregate
+                aggregateName = aggregateName.name;
+        }
         const aggregate = this.#aggregateMap[aggregateName];
         if(!aggregate)
             throw new NotFoundError(`Aggregate '${aggregateName}' not found.`);

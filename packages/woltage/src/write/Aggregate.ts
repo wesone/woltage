@@ -24,7 +24,7 @@ type AggregateProjector<TState = any> = {
 };
 
 type CommandContext = {
-    aggregateId: string
+    aggregateId: string,
     aggregateVersion: number
 };
 
@@ -35,11 +35,12 @@ type CommandOptions = {
      * The name of the command.
      * Set this if the command function has no name or if you want to override it's name.
      */
-    commandName?: string,
+    name?: string
 };
 
-type CommandInfo<TState, TPayload extends z.ZodType = any> = {
-    name: string
+export type CommandInfo<TState, TPayload extends z.ZodType = any> = {
+    aggregate: Aggregate<TState>,
+    name: string,
     schema: TPayload,
     command: Command<TState, TPayload>,
     options: CommandOptions
@@ -75,14 +76,15 @@ class Aggregate<TState = any>
         }
         options ??= {};
 
-        const commandName = options.commandName ?? command.name;
-        if(!commandName.length)
-            throw new Error('Command has no name. Provide a named function or options.commandName to registerCommand.');
-        if(this.#commands[commandName])
-            throw new Error(`Command '${commandName}' already exists in aggregate '${this.name}'.`);
-        this.#commands[commandName] = {schema, command, options};
+        const name = options.name ?? command.name;
+        if(!name.length)
+            throw new Error('Command has no name. Provide a named function or options.name to registerCommand.');
+        if(this.#commands[name])
+            throw new Error(`Command '${name}' already exists in aggregate '${this.name}'.`);
+        this.#commands[name] = {schema, command, options};
         return {
-            name: commandName,
+            aggregate: this,
+            name,
             schema,
             command,
             options

@@ -45,7 +45,7 @@ describe('Aggregate', async () => {
         const cmd = () => {};
         assert.doesNotThrow(() => aggregate.registerCommand(cmd));
         assert.throws(() => aggregate.registerCommand(() => {}));
-        assert.doesNotThrow(() => aggregate.registerCommand(() => {}, {commandName: 'testcommand'}));
+        assert.doesNotThrow(() => aggregate.registerCommand(() => {}, {name: 'testcommand'}));
     });
 
     await it('prevents registering commands with the same name', async () => {
@@ -53,7 +53,7 @@ describe('Aggregate', async () => {
         assert.doesNotThrow(() => aggregate.registerCommand(function doSomething() {}));
         assert.doesNotThrow(() => aggregate.registerCommand(function doSomethingElse() {}));
         assert.throws(() => aggregate.registerCommand(function doSomething() {}));
-        assert.throws(() => aggregate.registerCommand(() => {}, {commandName: 'doSomethingElse'}));
+        assert.throws(() => aggregate.registerCommand(() => {}, {name: 'doSomethingElse'}));
     });
 
     await it('returns command infos after registering', async () => {
@@ -61,6 +61,7 @@ describe('Aggregate', async () => {
         const schema = z.any();
         const command = function doSomething() {};
         assert.deepEqual(aggregate.registerCommand(schema, command), {
+            aggregate,
             name: command.name,
             schema,
             command,
