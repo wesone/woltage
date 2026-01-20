@@ -65,6 +65,10 @@ export default class Event<TPayload extends z.ZodType = any, TMeta = any> implem
         return new (getEventClass(data.type, data.version))(data, shouldValidate);
     }
 
+    static getDisplayName(type = this.type, version = this.version) {
+        return `${type}@${version}`;
+    }
+
     id: string;
     timestamp: number;
     aggregateId: string;
@@ -78,7 +82,7 @@ export default class Event<TPayload extends z.ZodType = any, TMeta = any> implem
         if(typeof this.version !== 'number' || this.version <= 0)
             throw new Error('Event\'s version property must be a number > 0.');
         if(typeof this.constructor.schema?.parse !== 'function')
-            throw new Error(`Missing schema for event class '${this.type}@${this.version}'.`);
+            throw new Error(`Missing schema for event class '${this.getDisplayName()}'.`);
         if('type' in data && this.type !== data.type)
             throw new Error(`Event type does not match event data ("${this.type}" not equal "${data.type}").`);
         if('version' in data && this.version !== data.version)
@@ -128,7 +132,7 @@ export default class Event<TPayload extends z.ZodType = any, TMeta = any> implem
 
     toJSON() {
         if(!this.aggregateId)
-            throw new Error(`Invalid event state. Missing aggregate ID for '${this.type}@${this.version}' event.`);
+            throw new Error(`Invalid event state. Missing aggregate ID for '${this.getDisplayName()}' event.`);
         return {
             id: this.id,
             type: this.type,
@@ -141,5 +145,9 @@ export default class Event<TPayload extends z.ZodType = any, TMeta = any> implem
             meta: this.meta,
             position: this.position
         };
+    }
+
+    getDisplayName() {
+        return this.constructor.getDisplayName();
     }
 }

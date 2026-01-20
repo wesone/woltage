@@ -13,7 +13,7 @@ export const registerEventClasses = (eventClasses: (typeof Event)[]) => {
     eventClasses.forEach(EventClass => {
         eventMap[EventClass.type] ??= {};
         if(eventMap[EventClass.type][EventClass.version])
-            throw new Error(`Duplicate event class found. Event '${EventClass.type}@${EventClass.version}' already exists.`);
+            throw new Error(`Duplicate event class found. Event '${EventClass.getDisplayName()}' already exists.`);
         eventMap[EventClass.type][EventClass.version] = EventClass;
     });
 };

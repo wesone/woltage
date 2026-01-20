@@ -25,6 +25,10 @@ class Projection
         return `${name}-${version}`;
     }
 
+    static getDisplayName(name: string, version: number) {
+        return `${name}@${version}`;
+    }
+
     readonly id: string;
     readonly name: string;
     readonly version: number;
@@ -116,6 +120,10 @@ class Projection
                 version: this.projector.constructor.version
             }
         };
+    }
+
+    getDisplayName() {
+        return Projection.getDisplayName(this.name, this.version);
     }
 }
 

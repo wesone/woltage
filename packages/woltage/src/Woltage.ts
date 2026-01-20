@@ -65,7 +65,7 @@ class Woltage
         return projectorClasses.reduce((map, ProjectorClass) => {
             map[ProjectorClass.name] ??= {};
             if(map[ProjectorClass.name][ProjectorClass.version])
-                throw new Error(`Duplicate projector class found. Projector '${ProjectorClass.name}@${ProjectorClass.version}' already exists.`);
+                throw new Error(`Duplicate projector class found. Projector '${ProjectorClass.getDisplayName()}' already exists.`);
             map[ProjectorClass.name][ProjectorClass.version] = ProjectorClass;
             return map;
         }, {} as ProjectorMap);
@@ -175,7 +175,7 @@ class Woltage
 
         const ProjectorClass = this.#projectorMap[projectorName]?.[projectorVersion];
         if(!ProjectorClass)
-            throw new NotFoundError(`Projector '${projectorName}@${projectorVersion}' not found`);
+            throw new NotFoundError(`Projector '${Projector.getDisplayName(projectorName, projectorVersion)}' not found`);
         const store = this.#getStore(storeName, projectionId);
 
         const projection = new Projection(projectionName, projectionVersion, ProjectorClass, store);

@@ -10,6 +10,10 @@ class Projector<Definitions extends TableDefinitionMap>
     static schema: TableDefinitionMap;
     static version: number;
 
+    static getDisplayName(name = this.name, version = this.version) {
+        return `${name}@${version}`;
+    }
+
     #registry: EventRegistry;
     readonly store: IStore<Definitions>;
     readonly emit = emit;
@@ -32,6 +36,10 @@ class Projector<Definitions extends TableDefinitionMap>
     async onEvent(e: Event) {
         const {event, handler} = await this.#registry.get(e);
         await handler?.(event);
+    }
+
+    getDisplayName() {
+        return this.constructor.getDisplayName();
     }
 }
 

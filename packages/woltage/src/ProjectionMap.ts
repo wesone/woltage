@@ -12,10 +12,10 @@ export default class ProjectionMap
     setActive(projectionName: string, projectionVersion: number, force = false) {
         const projectionId = Projection.getId(projectionName, projectionVersion);
         if(!this.idMap.has(projectionId))
-            throw new Error(`Unknown projection '${projectionName}@${projectionVersion}'`);
+            throw new Error(`Unknown projection '${Projection.getDisplayName(projectionName, projectionVersion)}'`);
         const projection = this.idMap.get(projectionId)!;
         if(!projection.isLiveTracking && !force)
-            throw new Error(`Projection '${projectionName}@${projectionVersion}' is not tracking live events.`);
+            throw new Error(`Projection '${projection.getDisplayName()}' is not tracking live events.`);
         this.activeProjectionMap.set(projectionName, projection);
     }
 
@@ -39,7 +39,7 @@ export default class ProjectionMap
 
         const isActive = this.getActive(projectionName) === projection;
         if(!force && isActive)
-            throw new Error(`Can not remove active projection '${projectionName}@${projectionVersion}'.`);
+            throw new Error(`Can't remove active projection '${projection.getDisplayName()}'.`);
 
         await projection.stop();
         this.idMap.delete(projection.id);

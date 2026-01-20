@@ -1,5 +1,5 @@
 // import type {z} from 'zod/v4';
-import type Event from './Event.ts';
+import Event from './Event.ts';
 import eventMap from './eventMap.ts';
 
 export default class EventCaster
@@ -27,7 +27,7 @@ export default class EventCaster
         // eventMap is not up to date
         if(!eventMap[eventType]?.[eventVersion] || !eventMap[eventType]?.[targetVersion])
         {
-            throw new Error(`Event casting from '${eventType}@${eventVersion}' to '${eventType}@${targetVersion}' failed because eventMap is not up to date.`);
+            throw new Error(`Event casting from '${event.getDisplayName()}' to '${Event.getDisplayName(eventType, targetVersion)}' failed because eventMap is not up to date.`);
             //TODO implement remote casting to some service that always has the latest event updates
         }
 
