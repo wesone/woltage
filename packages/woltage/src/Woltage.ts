@@ -98,32 +98,43 @@ class Woltage
         this.#projections = new ProjectionMap();
     }
 
+    async #loadModules<TModule>(
+        pathOrModules: string | TModule[] | undefined, filter: (module: any) => boolean): Promise<TModule[]> {
+        return typeof pathOrModules === 'string'
+            ? await importModules(pathOrModules, filter)
+            : pathOrModules ?? [];
+    }
+
     async #init() {
         registerEventClasses(
-            typeof this.config.eventClasses === 'string'
-                ? await importModules(this.config.eventClasses, module => module.prototype instanceof Event)
-                : this.config.eventClasses
+            await this.#loadModules(
+                this.config.eventClasses,
+                module => module.prototype instanceof Event
+            )
         );
 
         this.#aggregateMap = Woltage.#constructAggregateMap(
-            typeof this.config.aggregates === 'string'
-                ? await importModules(this.config.aggregates, module => module instanceof Aggregate)
-                : this.config.aggregates
+            await this.#loadModules(
+                this.config.aggregates,
+                module => module instanceof Aggregate
+            )
         );
 
         this.#projectorMap = Woltage.#constructProjectorMap(
-            typeof this.config.projectorClasses === 'string'
-                ? await importModules(this.config.projectorClasses, module => module.prototype instanceof Projector)
-                : this.config.projectorClasses
+            await this.#loadModules(
+                this.config.projectorClasses,
+                module => module.prototype instanceof Projector
+            )
         );
 
         this.#readModelMap = Object.fromEntries(
             (
-                typeof this.config.readModelClasses === 'string'
-                    ? await importModules(this.config.readModelClasses, module => module.prototype instanceof ReadModel)
-                    : this.config.readModelClasses ?? []
+                await this.#loadModules(
+                    this.config.readModelClasses,
+                    module => module.prototype instanceof ReadModel
+                )
             )
-                .map(ReadModelClass => [ReadModelClass.toString(), new ReadModelClass()])
+                .map(ReadModelClass => [ReadModelClass.toString(), new (ReadModelClass as any)()])
         );
 
         await this.#store.connect();
