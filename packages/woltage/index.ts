@@ -13,6 +13,7 @@ export * from './src/adapters/Store.ts';
 export type * from './src/Event.ts';
 export {default as Event} from './src/Event.ts';
 export {default as Aggregate} from './src/write/Aggregate.ts';
+export type * from './src/write/Aggregate.ts';
 export {default as Projector} from './src/read/Projector.ts';
 export {default as ReadModel} from './src/read/ReadModel.ts';
 export {default as sideEffect} from './src/read/sideEffect.ts';

@@ -1,3 +1,4 @@
+import type Event from './Event.ts';
 import {IEventStore} from './adapters/EventStore.ts';
 import {IStore} from './adapters/Store.ts';
 import Projector from './read/Projector.ts';

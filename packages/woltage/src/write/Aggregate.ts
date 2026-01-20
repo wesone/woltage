@@ -1,13 +1,12 @@
 import {z} from 'zod/v4';
 import NotFoundError from '../errors/NotFoundError.ts';
 import Event from '../Event.ts';
-import EventStore from '../EventStore.ts';
 import {
     STATE_NEW,
     type AppendRevision
 } from '../adapters/EventStore.ts';
 import EventRegistry from '../EventRegistry.ts';
-import {executionStorage} from '../localStorages.ts';
+import {readStore, executionStorage} from '../localStorages.ts';
 import validate from '../validate.ts';
 
 type AggregateProjector<TState = any> = {
@@ -92,7 +91,7 @@ class Aggregate<TState = any>
     }
 
     async #getStatus(aggregateId: string) {
-        const events = EventStore.read(this.name, aggregateId);
+        const events = readStore(executionStorage).eventStore.read(this.name, aggregateId);
         const status = {
             state: (this.projector.$init?.() ?? {}) as TState,
             revision: STATE_NEW as AppendRevision,
@@ -124,13 +123,17 @@ class Aggregate<TState = any>
         const {schema, command/* , options */} = this.#commands[commandName];
         payload = validate(schema, payload);
 
+        const {eventStore, context} = readStore(executionStorage);
         const {state, revision, version: aggregateVersion} = await this.#getStatus(aggregateId);
-        const context = Object.freeze({
-            ...(executionStorage.getStore()?.context ?? {}),
-            aggregateId,
-            aggregateVersion
-        });
-        let events = await command(state, payload, context);
+        let events = await command(
+            state,
+            payload,
+            Object.freeze({
+                ...(context ?? {}),
+                aggregateId,
+                aggregateVersion
+            })
+        );
         if(!events)
             return;
 
@@ -139,7 +142,7 @@ class Aggregate<TState = any>
         events.forEach(event => {
             event.aggregateId = aggregateId;
         });
-        await EventStore.append(
+        await eventStore.append(
             this.name,
             aggregateId,
             events,

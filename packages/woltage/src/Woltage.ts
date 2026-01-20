@@ -1,6 +1,5 @@
 import importModules from './utils/importModules.ts';
 import Aggregate, {type CommandInfo} from './write/Aggregate.ts';
-import EventStore from './EventStore.ts';
 import Event from './Event.ts';
 import {registerEventClasses} from './eventMap.ts';
 import Projector from './read/Projector.ts';
@@ -83,12 +82,15 @@ class Woltage
     #aggregateMap: AggregateMap = {};
     #projectorMap: ProjectorMap = {};
     #readModelMap: Record<string, ReadModel> = {};
+    #eventStore;
     #store: IStore<typeof projectionConfigSchema>;
     #getStore: ReturnType<typeof createStoreFactory>;
     #projections: ProjectionMap;
 
     constructor(config: WoltageConfig) {
         this.config = config;
+
+        this.#eventStore = new this.config.eventStore.adapter(...(this.config.eventStore.args ?? []));
 
         this.#store = createStore(this.config.internalStore, '_woltage_config');
         this.#store.defineTables(projectionConfigSchema);
@@ -98,8 +100,7 @@ class Woltage
         this.#projections = new ProjectionMap();
     }
 
-    async #loadModules<TModule>(
-        pathOrModules: string | TModule[] | undefined, filter: (module: any) => boolean): Promise<TModule[]> {
+    async #loadModules<TModule>(pathOrModules: string | TModule[] | undefined, filter: (module: any) => boolean): Promise<TModule[]> {
         return typeof pathOrModules === 'string'
             ? await importModules(pathOrModules, filter)
             : pathOrModules ?? [];
@@ -189,7 +190,7 @@ class Woltage
             throw new NotFoundError(`Projector '${Projector.getDisplayName(projectorName, projectorVersion)}' not found`);
         const store = this.#getStore(storeName, projectionId);
 
-        const projection = new Projection(projectionName, projectionVersion, ProjectorClass, store);
+        const projection = new Projection(this.#eventStore, projectionName, projectionVersion, ProjectorClass, store);
         projection.storeName = storeName;
 
         await store.connect();
@@ -224,6 +225,7 @@ class Woltage
     async #execute(routine: () => unknown, context?: any) {
         return await executionStorage.run(
             {
+                eventStore: this.#eventStore,
                 readModelMap: this.#readModelMap,
                 projectionMap: new Map(this.#projections.activeProjectionMap),
                 context
@@ -275,13 +277,13 @@ class Woltage
     }
 
     async start() {
-        await EventStore.init(new this.config.eventStore.adapter(...(this.config.eventStore.args ?? [])));
+        await this.#eventStore.connect();
         await this.#projections.init();
     }
 
     async stop() {
         await this.#projections.stop();
-        await EventStore.close();
+        await this.#eventStore.close();
     }
 }
 

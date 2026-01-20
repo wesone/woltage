@@ -2,9 +2,8 @@ import {z} from 'zod/v4';
 import type Projector from './Projector.ts';
 import {projectionStorage} from '../localStorages.ts';
 import Event from '../Event.ts';
-import EventStore from '../EventStore.ts';
 import type {IStore} from '../adapters/Store.ts';
-import {START, SubscriptionStream} from '../adapters/EventStore.ts';
+import {IEventStore, START, SubscriptionStream} from '../adapters/EventStore.ts';
 
 const configPrefix = '_woltage';
 
@@ -29,6 +28,7 @@ class Projection
         return `${name}@${version}`;
     }
 
+    readonly #eventStore: IEventStore;
     readonly id: string;
     readonly name: string;
     readonly version: number;
@@ -39,7 +39,8 @@ class Projection
     #latestPosition: bigint = -1n;
     #subscription?: SubscriptionStream;
 
-    constructor(name: string, version: number, ProjectorClass: typeof Projector, store: IStore<typeof configDefinition>) {
+    constructor(eventStore: IEventStore, name: string, version: number, ProjectorClass: typeof Projector, store: IStore<typeof configDefinition>) {
+        this.#eventStore = eventStore;
         this.id = Projection.getId(name, version);
         this.name = name;
         this.version = version;
@@ -59,13 +60,13 @@ class Projection
     async init() {
         const filter = {types: this.projector.types};
 
-        this.#latestPosition = await EventStore.getLatestPosition(filter) ?? -1n;
+        this.#latestPosition = await this.#eventStore.getLatestPosition(filter) ?? -1n;
         const startPosition = (await this.projector.store.tables[configPrefix].get({projectionId: this.id}))?.position;
         // if stored position is same as latestPosition update isReplaying and isLiveTracking immediately
         if(startPosition && startPosition >= this.#latestPosition || this.#latestPosition < 0n)
             this.#onReplayed();
 
-        this.#subscription = EventStore.subscribe({
+        this.#subscription = this.#eventStore.subscribe({
             fromRevision: startPosition ?? START,
             filter
         });
@@ -94,7 +95,11 @@ class Projection
     async onEvent(event: Event) {
         //TODO handle errors and retry do not kill the application
         await projectionStorage.run(
-            {isReplaying: this.isReplaying, currentEvent: event},
+            {
+                isReplaying: this.isReplaying,
+                currentEvent: event,
+                eventStore: this.#eventStore
+            },
             () => this.projector.onEvent(event)
         );
         // if the framework should handle idempotency, we would need to update the projection and save the handled position transactionally

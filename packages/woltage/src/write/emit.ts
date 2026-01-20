@@ -1,6 +1,6 @@
 import type Event from '../Event.ts';
-import EventStore from '../EventStore.ts';
 import sideEffect from '../read/sideEffect.ts';
+import {readStore, projectionStorage} from '../localStorages.ts';
 
 export default sideEffect(
     async ({aggregateName, events}: {aggregateName: string, events: Event | Event[]}) => {
@@ -14,6 +14,6 @@ export default sideEffect(
             eventGroups.get(event.aggregateId).push(event);
         }
         for(const [aggregateId, events] of eventGroups.entries())
-            await EventStore.append(aggregateName, aggregateId, events);
+            await readStore(projectionStorage).eventStore.append(aggregateName, aggregateId, events);
     },
 );

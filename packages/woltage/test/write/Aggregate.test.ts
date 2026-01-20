@@ -1,14 +1,15 @@
-import {describe, it, mock, after} from 'node:test';
+import {describe, it, mock, afterEach} from 'node:test';
 import assert from 'node:assert/strict';
 
 import Aggregate from '../../src/write/Aggregate.ts';
-import mockEventStore from '../_mock/mockEventStore.ts';
+import eventStore from '../_mock/eventStore.ts';
 import mockEventClass from '../_mock/mockEventClass.ts';
+import {executionStorage} from '../../src/localStorages.ts';
 import {STATE_NEW} from '../../src/adapters/EventStore.ts';
 import {z} from 'zod/v4';
 
 describe('Aggregate', async () => {
-    after(() => mock.reset());
+    afterEach(() => eventStore.mockReset());
 
     await it('can be created', async () => {
         const aggregate = Aggregate.create('test', {});
@@ -16,7 +17,8 @@ describe('Aggregate', async () => {
     });
 
     await it('can have commands', async () => {
-        mockEventStore();
+        (executionStorage as any).enterWith({eventStore});
+
         const initState = {test: 42};
         const aggregate = Aggregate.create('test', {
             $init() {return initState;}
@@ -70,12 +72,14 @@ describe('Aggregate', async () => {
     });
 
     await it('constructs aggregate state for commands', async () => {
+        (executionStorage as any).enterWith({eventStore});
+
         const aggregateName = 'test';
         const PetRegisteredEvent = mockEventClass('pet.registered');
         const PetRenamedEvent = mockEventClass('pet.renamed');
         const aggregateId1 = 'uuid1';
         const aggregateId2 = 'uuid2';
-        mockEventStore({
+        eventStore.mock({
             [aggregateName]: [
                 new PetRegisteredEvent({aggregateId: aggregateId1, payload: {name: 'Lucky'}}),
                 new PetRegisteredEvent({aggregateId: aggregateId2, payload: {name: 'Jefferson'}}),
@@ -121,10 +125,12 @@ describe('Aggregate', async () => {
     });
 
     await it('does not swallow exceptions that occur in aggregate projector', async () => {
+        (executionStorage as any).enterWith({eventStore});
+
         const TestEvent = mockEventClass('test');
         const aggregateName = 'test';
         const aggregateId = 'uuid1';
-        mockEventStore({
+        eventStore.mock({
             [aggregateName]: [
                 new TestEvent({aggregateId, payload: {}})
             ]
@@ -146,23 +152,23 @@ describe('Aggregate', async () => {
             $init() {return initState;}
         });
         const TestEvent = mockEventClass('test');
-        const command = function doSomething(state, payload) {
+        const {name: commandName} = aggregate.registerCommand(function doSomething(state: any, payload: any) {
             return new TestEvent({
                 payload: {commandValue: payload?.cmd}
             });
-        };
-        aggregate.registerCommand(command);
+        });
 
         await it('can append events', async () => {
-            const EventStore = mockEventStore();
+            (executionStorage as any).enterWith({eventStore});
+
             const commandPayload = {cmd: 21};
             const aggregateId = 'fourtytwo';
 
-            await assert.doesNotReject(() => aggregate.executeCommand(aggregateId, command.name, commandPayload));
+            await assert.doesNotReject(() => aggregate.executeCommand(aggregateId, commandName, commandPayload));
 
-            assert.strictEqual(EventStore.append.mock.callCount(), 1);
+            assert.strictEqual(eventStore.append.mock.callCount(), 1);
             assert.partialDeepStrictEqual(
-                EventStore.append.mock.calls[0].arguments,
+                eventStore.append.mock.calls[0].arguments,
                 [
                     aggregate.name,
                     aggregateId,
@@ -173,21 +179,24 @@ describe('Aggregate', async () => {
         });
 
         await it('use optimistic concurrency control per aggregate id', async () => {
-            const EventStore = mockEventStore();
+            (executionStorage as any).enterWith({eventStore});
+
             const aggregateId = 'fourtytwo';
 
             const results = await Promise.allSettled([
-                aggregate.executeCommand(aggregateId, command.name, {}),
-                aggregate.executeCommand('twentyone', command.name, {}),
-                aggregate.executeCommand(aggregateId, command.name, {})
+                aggregate.executeCommand(aggregateId, commandName, {}),
+                aggregate.executeCommand('twentyone', commandName, {}),
+                aggregate.executeCommand(aggregateId, commandName, {})
             ]);
 
-            assert.strictEqual(EventStore.append.mock.callCount(), 3);
+            assert.strictEqual(eventStore.append.mock.callCount(), 3);
             assert.strictEqual(results.filter(({status}) => status === 'fulfilled').length, 2);
             assert.strictEqual(results.filter(({status}) => status === 'rejected').length, 1);
         });
 
         await it('validate payload against schema', async () => {
+            (executionStorage as any).enterWith({eventStore});
+
             const aggregate = Aggregate.create('test', {});
             const command = () => {};
             aggregate.registerCommand(
