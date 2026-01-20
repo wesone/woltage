@@ -1,6 +1,4 @@
-import fs from 'node:fs/promises';
-import path from 'node:path';
-
+import importModules from './utils/importModules.ts';
 import Aggregate, {type CommandInfo} from './write/Aggregate.ts';
 import EventStore from './EventStore.ts';
 import Event from './Event.ts';
@@ -54,20 +52,6 @@ const projectionConfigSchema = {
 
 class Woltage
 {
-    static async #importModules(dirPath: string, filter: (module: any) => boolean) {
-        const modules: any[] = [];
-        await Promise.all(
-            (await fs.readdir(dirPath, {withFileTypes: true, recursive: true}))
-                .filter(dirent => dirent.isFile() && ['ts', 'js'].includes(dirent.name.split('.').pop() ?? ''))
-                .map(async dirent => {
-                    const {default: module} = await import(path.join(dirent.parentPath, dirent.name));
-                    if(filter(module))
-                        modules.push(module);
-                })
-        );
-        return modules;
-    }
-
     static #constructAggregateMap(aggregates: Aggregate[]) {
         return aggregates.reduce((map, aggregate) => {
             if(map[aggregate.name])
@@ -117,26 +101,26 @@ class Woltage
     async #init() {
         registerEventClasses(
             typeof this.config.eventClasses === 'string'
-                ? await Woltage.#importModules(this.config.eventClasses, module => module.prototype instanceof Event)
+                ? await importModules(this.config.eventClasses, module => module.prototype instanceof Event)
                 : this.config.eventClasses
         );
 
         this.#aggregateMap = Woltage.#constructAggregateMap(
             typeof this.config.aggregates === 'string'
-                ? await Woltage.#importModules(this.config.aggregates, module => module instanceof Aggregate)
+                ? await importModules(this.config.aggregates, module => module instanceof Aggregate)
                 : this.config.aggregates
         );
 
         this.#projectorMap = Woltage.#constructProjectorMap(
             typeof this.config.projectorClasses === 'string'
-                ? await Woltage.#importModules(this.config.projectorClasses, module => module.prototype instanceof Projector)
+                ? await importModules(this.config.projectorClasses, module => module.prototype instanceof Projector)
                 : this.config.projectorClasses
         );
 
         this.#readModelMap = Object.fromEntries(
             (
                 typeof this.config.readModelClasses === 'string'
-                    ? await Woltage.#importModules(this.config.readModelClasses, module => module.prototype instanceof ReadModel)
+                    ? await importModules(this.config.readModelClasses, module => module.prototype instanceof ReadModel)
                     : this.config.readModelClasses ?? []
             )
                 .map(ReadModelClass => [ReadModelClass.toString(), new ReadModelClass()])
