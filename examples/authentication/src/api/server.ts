@@ -33,7 +33,7 @@ export default async (config: ServerConfig, woltage: Woltage) => {
     const app = express();
 
     registerMiddlewares(app, woltage);
-    registerHandlers(app);
+    await registerHandlers(app);
 
     // custom error handler for BadRequestError otherwise express will send error as HTML
     app.use((err: any, req: any, res: any, next: any) => {
