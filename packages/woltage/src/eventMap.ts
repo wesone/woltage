@@ -1,5 +1,5 @@
 import Event from './Event.ts';
-import {z} from 'zod/v4';
+import z from 'zod';
 
 type EventMap = {
     [eventType: string]: {

@@ -1,5 +1,5 @@
 import {randomUUID} from 'crypto';
-import {z} from 'zod/v4';
+import z from 'zod';
 import {projectionStorage} from './localStorages.ts';
 import {getEventClass} from './eventMap.ts';
 
@@ -110,7 +110,7 @@ export default class Event<TPayload extends z.ZodType = any, TMeta = any> implem
         this.position = position;
 
         this.payload = shouldValidate
-            ? this.constructor.validate(data.payload)
+            ? this.constructor.validate(data.payload) as z.infer<TPayload>
             : data.payload;
     }
 

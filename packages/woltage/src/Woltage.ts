@@ -4,7 +4,7 @@ import Event from './Event.ts';
 import {registerEventClasses} from './eventMap.ts';
 import Projector from './read/Projector.ts';
 import type {IStore} from './adapters/Store.ts';
-import {z} from 'zod/v4';
+import z from 'zod';
 import {createStore, createStoreFactory} from './StoreFactory.ts';
 import Projection from './read/Projection.ts';
 import ConflictError from './errors/ConflictError.ts';

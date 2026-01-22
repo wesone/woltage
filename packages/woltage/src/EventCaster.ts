@@ -1,4 +1,4 @@
-// import type {z} from 'zod/v4';
+// import type z from 'zod';
 import Event from './Event.ts';
 import eventMap from './eventMap.ts';
 

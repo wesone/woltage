@@ -2,7 +2,7 @@ import type Projector from './Projector.ts';
 import {executionStorage} from '../localStorages.ts';
 import NotFoundError from '../errors/NotFoundError.ts';
 import validate from '../validate.ts';
-import type {z} from 'zod/v4';
+import type z from 'zod';
 
 abstract class ReadModel<TProjector extends Projector<any> = any>
 {

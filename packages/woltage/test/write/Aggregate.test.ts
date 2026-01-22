@@ -6,7 +6,7 @@ import eventStore from '../_mock/eventStore.ts';
 import mockEventClass from '../_mock/mockEventClass.ts';
 import {executionStorage} from '../../src/localStorages.ts';
 import {STATE_NEW} from '../../src/adapters/EventStore.ts';
-import {z} from 'zod/v4';
+import z from 'zod';
 
 describe('Aggregate', async () => {
     afterEach(() => eventStore.mockReset());

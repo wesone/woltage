@@ -1,4 +1,4 @@
-import {z} from 'zod/v4';
+import z from 'zod';
 import type Projector from './Projector.ts';
 import {projectionStorage} from '../localStorages.ts';
 import Event from '../Event.ts';

@@ -1,4 +1,4 @@
-import {z} from 'zod/v4';
+import z from 'zod';
 import NotFoundError from '../errors/NotFoundError.ts';
 import Event from '../Event.ts';
 import {

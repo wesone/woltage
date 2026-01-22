@@ -1,4 +1,4 @@
-import {z} from 'zod/v4';
+import z from 'zod';
 import BadRequestError from './errors/BadRequestError.ts';
 
 export default function validate<TSchema extends z.ZodType>(schema: TSchema, data: any): z.infer<TSchema>
