@@ -398,7 +398,7 @@ A projection is used to bring the events into a form that is optimized for readi
 
 ### Version
 
-You can add multiple projections with the same name but with different versions. Each projection can use a different projector. When using read models, only one of the projection version is used by the read model (use [`woltage.setProjectionActive`](#setprojectionactive) to change the active version).
+You can add multiple projections with the same name but with different versions. Each projection can use a different projector. When using read models, only the active version of the projection is used by the read model (use [`woltage.setProjectionActive`](#setprojectionactive) to change the active version).
 
 Why? To prevent downtimes. It is useful whenever you need to update a projector. This way you can add the new projection with the new projector but still use the old projection while the new one is replaying (which may take some time). As soon as the new projection is up-to-date you can switch to the new projection (and delete the old one). 
 
@@ -631,6 +631,8 @@ A store adapter needs to implement the `IStore` interface but can have additiona
 `async executeCommand(aggregateName: string, aggregateId: string, commandName: string, payload: any, context?: any): Promise<void>`
 
 `async executeCommand(aggregate: Aggregate, aggregateId: string, commandName: string, payload: any, context?: any): Promise<void>`
+
+`async executeCommand(commandInfo: CommandInfo, aggregateId: string, payload: any, context?: any): Promise<any>`
 
 To execute a [command](#command) of an aggregate. If the optional `context` parameter was provided, it will be added to the context parameter of the command.
 
