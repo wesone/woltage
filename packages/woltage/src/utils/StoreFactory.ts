@@ -1,8 +1,10 @@
-import {StoreAdapterConfig} from './WoltageConfig.ts';
+import {StoreAdapterConfig} from '../WoltageConfig.ts';
 
 export function createStore(config: StoreAdapterConfig, prefix: string)
 {
-    return new config.adapter(prefix, ...(config.args ?? []));
+    const instance = new config.adapter(...(config.args ?? []));
+    instance.prefix = prefix;
+    return instance;
 }
 
 export function createStoreFactory(stores: Record<string, StoreAdapterConfig>)

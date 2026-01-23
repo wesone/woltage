@@ -1,21 +1,21 @@
 import type Event from './Event.ts';
-import {IEventStore} from './adapters/EventStore.ts';
-import {IStore} from './adapters/Store.ts';
-import Projector from './read/Projector.ts';
-import ReadModel from './read/ReadModel.ts';
-import Aggregate from './write/Aggregate.ts';
+import type {IEventStore} from './adapters/EventStore.ts';
+import type {IStore} from './adapters/Store.ts';
+import type Projector from './read/Projector.ts';
+import type ReadModel from './read/ReadModel.ts';
+import type Aggregate from './write/Aggregate.ts';
 
-export type EventStoreAdapterConfig<TClass extends IEventStore = IEventStore, TArgs extends any[] = any> = {
-    adapter: {new (...args: TArgs[]): TClass},
-    args?: TArgs
-}
-
-export type StoreAdapterConfig<TClass extends IStore = IStore, TArgs extends any[] = any> = {
-    adapter: {new (prefix: string, ...args: TArgs[]): TClass},
-    args?: TArgs
-}
+export type AdapterConfig<T extends new (...args: any) => any> = {
+    adapter: T,
+    args: ConstructorParameters<T>
+};
+export type EventStoreAdapterConfig<T extends new (...args: any) => IEventStore = any> = AdapterConfig<T>;
+export type StoreAdapterConfig<T extends new (...args: any) => IStore = any> = AdapterConfig<T>;
 
 export type WoltageConfig = {
+    /**
+     * An event store adapter.
+     */
     eventStore: EventStoreAdapterConfig,
     /**
      * An array of event classes or a path to a directory to import event classes from.
