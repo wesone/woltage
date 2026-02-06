@@ -1,4 +1,12 @@
-import type {IStore, TableDefinitionMap, TableDefinition, ITable, TableEntry, TableKey, TablePartialEntry} from 'woltage';
+import type {
+    IStore,
+    TableDefinitionMap,
+    TableDefinition,
+    ITable,
+    TableEntry,
+    TableKey,
+    TablePartialEntry
+} from 'woltage';
 import {createClient, type RedisClientOptions} from 'redis';
 
 class Table<Def extends TableDefinition> implements ITable<Def> {
@@ -86,12 +94,11 @@ class Table<Def extends TableDefinition> implements ITable<Def> {
 }
 
 export default class RedisStore<Definitions extends TableDefinitionMap> implements IStore {
-    prefix: string;
-    tables!: { [K in keyof Definitions]: Table<Definitions[K]> & ReturnType<typeof createClient>; };
+    prefix = '';
+    tables = {} as { [K in keyof Definitions]: Table<Definitions[K]> & ReturnType<typeof createClient>; };
     #client: ReturnType<typeof createClient>;
 
-    constructor(prefix: string, clientOptions: RedisClientOptions) {
-        this.prefix = prefix;
+    constructor(clientOptions: RedisClientOptions) {
         this.#client = createClient(clientOptions)
             .on('error', (err: any) => console.log('Redis Client Error', err));
     }

@@ -1,4 +1,12 @@
-import type {IStore, TableDefinitionMap, TableDefinition, ITable, TableEntry, TableKey, TablePartialEntry} from 'woltage';
+import type {
+    IStore,
+    TableDefinitionMap,
+    TableDefinition,
+    ITable,
+    TableEntry,
+    TableKey,
+    TablePartialEntry
+} from 'woltage';
 import {z} from 'woltage';
 import {Pool, type PoolConfig, type PoolClient} from 'pg';
 import {AsyncLocalStorage} from 'node:async_hooks';
@@ -65,13 +73,12 @@ type AdapterConfig = {
 };
 
 export default class PostgreSQLStore<TableDefinitions extends TableDefinitionMap> implements IStore {
-    prefix: string;
-    tables!: { [K in keyof TableDefinitions]: Table<TableDefinitions[K]> };
+    prefix = '';
+    tables = {} as { [K in keyof TableDefinitions]: Table<TableDefinitions[K]> };
     #pool: Pool;
     #config: AdapterConfig;
 
-    constructor(prefix: string, pgConfig?: PoolConfig, adapterConfig?: AdapterConfig) {
-        this.prefix = prefix;
+    constructor(pgConfig?: PoolConfig, adapterConfig?: AdapterConfig) {
         this.#pool = new Pool(pgConfig);
         this.#pool.on('error', err => {
             console.error('Unexpected PostgreSQL error on idle client', err);

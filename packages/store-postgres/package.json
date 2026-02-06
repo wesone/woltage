@@ -18,11 +18,11 @@
     "prepack": "npm run build"
   },
   "peerDependencies": {
-    "pg": "^8.16.0",
+    "pg": "^8.17.2",
     "woltage": "^1.0.3"
   },
   "devDependencies": {
-    "@types/pg": "^8.15.4",
+    "@types/pg": "^8.16.0",
     "typescript": "^5.8.3"
   },
   "files": [

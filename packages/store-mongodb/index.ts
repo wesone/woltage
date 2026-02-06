@@ -1,5 +1,19 @@
-import type {IStore, TableDefinitionMap, TableDefinition, ITable, TableEntry, TableKey, TablePartialEntry} from 'woltage';
-import {Collection, Db, MongoClient, type MongoClientOptions} from 'mongodb';
+import type {
+    IStore,
+    TableDefinitionMap,
+    TableDefinition,
+    ITable,
+    TableEntry,
+    TableKey,
+    TablePartialEntry
+} from 'woltage';
+import {
+    Collection,
+    Db,
+    MongoClient,
+    type MongoClientOptions,
+    type Filter
+} from 'mongodb';
 
 class Table<Def extends TableDefinition> implements ITable<Def> {
     collection: Collection<TableEntry<Def>>;
@@ -20,31 +34,35 @@ class Table<Def extends TableDefinition> implements ITable<Def> {
         });
     }
 
+    #getKey(key: TableKey<Def>) {
+        // strip properties that are not part of the key
+        return this.definition.key.parse(key) as TableKey<Def>;
+    }
+
     async set(entry: TableEntry<Def>) {
-        await this.collection.updateOne(this.definition.key.parse(entry), {$set: entry}, {upsert: true});
+        await this.collection.updateOne(this.#getKey(entry) as Filter<TableEntry<Def>>, {$set: entry}, {upsert: true});
     }
 
     get(key: TableKey<Def>) {
-        return this.collection.findOne(key, {projection: {_id: 0}}) as Promise<TableEntry<Def> | null>;
+        return this.collection.findOne(this.#getKey(key) as Filter<TableKey<Def>>, {projection: {_id: 0}}) as Promise<TableEntry<Def> | null>;
     }
 
     async update(key: TableKey<Def>, values: TablePartialEntry<Def>) {
-        await this.collection.updateOne(key, {$set: values});
+        await this.collection.updateOne(this.#getKey(key) as Filter<TableKey<Def>>, {$set: values});
     }
 
     async remove(key: TableKey<Def>) {
-        await this.collection.deleteOne(key);
+        await this.collection.deleteOne(this.#getKey(key) as Filter<TableKey<Def>>);
     }
 }
 
 export default class MongoDBStore<Definitions extends TableDefinitionMap> implements IStore {
-    prefix: string;
-    tables!: { [K in keyof Definitions]: Table<Definitions[K]> & Collection<TableEntry<Definitions[K]>>; };
+    prefix = '';
+    tables = {} as { [K in keyof Definitions]: Table<Definitions[K]> & Collection<TableEntry<Definitions[K]>>; };
     #client: MongoClient;
     #db: Db;
 
-    constructor(prefix: string, url: string, options?: MongoClientOptions) {
-        this.prefix = prefix;
+    constructor(url: string, options?: MongoClientOptions) {
         this.#client = new MongoClient(url, options);
         this.#db = this.#client.db();
     }
