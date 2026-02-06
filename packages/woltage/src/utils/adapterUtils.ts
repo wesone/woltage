@@ -1,8 +1,13 @@
-import {StoreAdapterConfig} from '../WoltageConfig.ts';
+import type {AdapterConfig, StoreAdapterConfig} from '../WoltageConfig.ts';
+
+export function constructAdapter<T extends new(...args: any) => any>(config: AdapterConfig<T>)
+{
+    return new config.adapter(...(config.args ?? []));
+}
 
 export function createStore(config: StoreAdapterConfig, prefix: string)
 {
-    const instance = new config.adapter(...(config.args ?? []));
+    const instance = constructAdapter(config);
     instance.prefix = prefix;
     return instance;
 }

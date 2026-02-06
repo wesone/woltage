@@ -1,16 +1,18 @@
 import type Event from './Event.ts';
 import type {IEventStore} from './adapters/EventStore.ts';
 import type {IStore} from './adapters/Store.ts';
+import type {IScheduler} from './adapters/Scheduler.ts';
 import type Projector from './read/Projector.ts';
 import type ReadModel from './read/ReadModel.ts';
 import type Aggregate from './write/Aggregate.ts';
 
-export type AdapterConfig<T extends new (...args: any) => any> = {
+export type AdapterConfig<T extends new (...args: any) => any = any> = {
     adapter: T,
     args: ConstructorParameters<T>
 };
 export type EventStoreAdapterConfig<T extends new (...args: any) => IEventStore = any> = AdapterConfig<T>;
 export type StoreAdapterConfig<T extends new (...args: any) => IStore = any> = AdapterConfig<T>;
+export type SchedulerAdapterConfig<T extends new (...args: any) => IScheduler = any> = AdapterConfig<T>;
 
 export type WoltageConfig = {
     /**
@@ -54,5 +56,12 @@ export type WoltageConfig = {
      *
      * Default: true
      */
-    autostart?: boolean
+    autostart?: boolean,
+    /**
+     * A custom scheduler adapter to use for scheduling commands.
+     * Without a scheduler adapter, the scheduling feature is disabled.
+     */
+    scheduler?: SchedulerAdapterConfig
+
+    //TODO add options for custom side effect executor
 }

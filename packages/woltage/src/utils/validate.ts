@@ -1,5 +1,5 @@
 import z from 'zod';
-import BadRequestError from './errors/BadRequestError.ts';
+import BadRequestError from '../errors/BadRequestError.ts';
 
 export default function validate<TSchema extends z.ZodType>(schema: TSchema, data: any): z.infer<TSchema>
 {

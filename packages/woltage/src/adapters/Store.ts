@@ -18,7 +18,6 @@ export interface ITable<Def extends TableDefinition> {
 };
 
 export type TableMap<Definitions extends TableDefinitionMap> = {[K in keyof Definitions]: ITable<Definitions[K]>;};
-// export type TableMap<Definitions extends TableDefinitionMap, TTable extends ITable<any> = ITable<any>> = {[K in keyof Definitions]: TTable<Definitions[K]>;}
 
 export interface IStore<Definitions extends TableDefinitionMap = any> {
     prefix: string;

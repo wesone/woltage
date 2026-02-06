@@ -13,8 +13,8 @@
   "homepage": "https://github.com/wesone/woltage",
   "scripts": {
     "build": "npx tsc -p tsconfig.json",
-    "test": "node --test --experimental-test-coverage './test/**/*.test.*'",
-    "test-watch": "node --watch --test './test/**/*.test.*'",
+    "test": "node --test --experimental-test-coverage --test-coverage-exclude=test/**/* 'test/**/*.test.*'",
+    "test-watch": "node --watch --test 'test/**/*.test.*'",
     "prepack": "(npm run build) && (cp ../../README.md ./)",
     "postpack": "rm README.md"
   },

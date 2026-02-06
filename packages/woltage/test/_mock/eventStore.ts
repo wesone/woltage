@@ -24,11 +24,13 @@ class EventStore implements MockedEventStore
 
     constructor() {
         const state = this.state;
+
         this.read = mock.fn(
             (aggregateName: string, aggregateId: string) => (async function* () {
-                if(!state.existingEvents[aggregateName] || !state.existingEvents[aggregateName].length)
+                if(!state.existingEvents[aggregateName]?.length)
                     throw new NotFoundError();
-                const events = state.existingEvents[aggregateName].filter(event => event.aggregateId === aggregateId);
+                const events = state.existingEvents[aggregateName]
+                    .filter(event => event.aggregateId === aggregateId);
                 let revision = 0n;
                 while(events.length)
                 {
@@ -49,9 +51,9 @@ class EventStore implements MockedEventStore
                 }
             })()
         );
+
         this.append = mock.fn(
             (aggregateName: string, aggregateId: string, events: Event[], revision: AppendRevision) => {
-                console.log(aggregateName, aggregateId);
                 state.existingEvents[aggregateName] ??= [];
                 const currentEvents = state.existingEvents[aggregateName].filter(event => event.aggregateId === aggregateId);
                 if(

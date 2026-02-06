@@ -1,6 +1,7 @@
 import type Event from '../Event.ts';
 import EventRegistry from '../EventRegistry.ts';
-import emit from '../write/emit.ts';
+import emit from '../sideEffects/emit.ts';
+import scheduleCommand from '../sideEffects/scheduleCommand.ts';
 import type {IStore, TableDefinitionMap} from '../adapters/Store.ts';
 
 class Projector<Definitions extends TableDefinitionMap>
@@ -17,6 +18,7 @@ class Projector<Definitions extends TableDefinitionMap>
     #registry: EventRegistry;
     readonly store: IStore<Definitions>;
     readonly emit = emit;
+    readonly scheduleCommand = scheduleCommand;
 
     constructor(store: IStore) {
         if(!typeof this.constructor.schema)

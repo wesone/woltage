@@ -1,5 +1,5 @@
 import type Event from '../Event.ts';
-import sideEffect from '../read/sideEffect.ts';
+import sideEffect from './sideEffect.ts';
 import {readStore, projectionStorage} from '../localStorages.ts';
 
 export default sideEffect(

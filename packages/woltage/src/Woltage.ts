@@ -5,14 +5,15 @@ import {registerEventClasses} from './eventMap.ts';
 import Projector from './read/Projector.ts';
 import type {IStore} from './adapters/Store.ts';
 import z from 'zod';
-import {createStore, createStoreFactory} from './StoreFactory.ts';
+import {constructAdapter, createStore, createStoreFactory} from './utils/adapterUtils.ts';
 import Projection from './read/Projection.ts';
 import ConflictError from './errors/ConflictError.ts';
 import ProjectionMap from './ProjectionMap.ts';
 import ReadModel from './read/ReadModel.ts';
 import NotFoundError from './errors/NotFoundError.ts';
 import {executionStorage} from './localStorages.ts';
-import {WoltageConfig} from './WoltageConfig.ts';
+import type {WoltageConfig} from './WoltageConfig.ts';
+import type {IScheduler} from './adapters/Scheduler.ts';
 
 export type AggregateMap = {[aggregateName: string]: Aggregate};
 
@@ -86,11 +87,12 @@ class Woltage
     #store: IStore<typeof projectionConfigSchema>;
     #getStore: ReturnType<typeof createStoreFactory>;
     #projections: ProjectionMap;
+    #scheduler: IScheduler | undefined;
 
     constructor(config: WoltageConfig) {
         this.config = config;
 
-        this.#eventStore = new this.config.eventStore.adapter(...(this.config.eventStore.args ?? []));
+        this.#eventStore = constructAdapter(this.config.eventStore);
 
         this.#store = createStore(this.config.internalStore, '_woltage_config');
         this.#store.defineTables(projectionConfigSchema);
@@ -98,6 +100,9 @@ class Woltage
         this.#getStore = createStoreFactory(this.config.stores ?? {});
 
         this.#projections = new ProjectionMap();
+
+        if(this.config.scheduler)
+            this.#scheduler = constructAdapter(this.config.scheduler);
     }
 
     async #loadModules<TModule>(pathOrModules: string | TModule[] | undefined, filter: (module: any) => boolean): Promise<TModule[]> {
@@ -141,6 +146,12 @@ class Woltage
         await this.#store.connect();
 
         await this.#loadProjections();
+
+        if(this.#scheduler)
+            this.#scheduler.subscribe(async (executeAt, data) => {
+                await this.executeCommand(...(data as Parameters<Woltage['executeCommand']>))
+                    .catch(console.info);
+            });
     }
 
     async #loadProjections() {
@@ -190,7 +201,14 @@ class Woltage
             throw new NotFoundError(`Projector '${Projector.getDisplayName(projectorName, projectorVersion)}' not found`);
         const store = this.#getStore(storeName, projectionId);
 
-        const projection = new Projection(this.#eventStore, projectionName, projectionVersion, ProjectorClass, store);
+        const projection = new Projection(
+            this,
+            this.#eventStore,
+            projectionName,
+            projectionVersion,
+            ProjectorClass,
+            store
+        );
         projection.storeName = storeName;
 
         await store.connect();
@@ -234,9 +252,9 @@ class Woltage
         );
     }
 
-    async executeCommand<TState, TPayload extends z.ZodType = any>(commandInfo: CommandInfo<TState, TPayload>, aggregateId: string, payload: any, context?: any): Promise<any>
-    async executeCommand(aggregate: Aggregate, aggregateId: string, commandName: string, payload: any, context?: any): Promise<any>
-    async executeCommand(aggregateName: string, aggregateId: string, commandName: string, payload: any, context?: any): Promise<any>
+    async executeCommand<TState, TPayload extends z.ZodType = any>(commandInfo: CommandInfo<TState, TPayload>, aggregateId: string, payload: any, context?: any): Promise<void>
+    async executeCommand(aggregate: Aggregate, aggregateId: string, commandName: string, payload: any, context?: any): Promise<void>
+    async executeCommand(aggregateName: string, aggregateId: string, commandName: string, payload: any, context?: any): Promise<void>
     async executeCommand(aggregateName: string | Aggregate | CommandInfo<any>, aggregateId: string, commandName: string, payload: any, context?: any) {
         if(typeof aggregateName !== 'string')
         {
@@ -257,6 +275,15 @@ class Woltage
         await this.#execute(() => aggregate.executeCommand(aggregateId, commandName, payload), context);
     }
 
+    async scheduleCommand<TState, TPayload extends z.ZodType = any>(executeAt: Date, commandInfo: CommandInfo<TState, TPayload>, aggregateId: string, payload: any, context?: any): Promise<void>
+    async scheduleCommand(executeAt: Date, aggregate: Aggregate, aggregateId: string, commandName: string, payload: any, context?: any): Promise<void>
+    async scheduleCommand(executeAt: Date, aggregateName: string, aggregateId: string, commandName: string, payload: any, context?: any): Promise<void>
+    async scheduleCommand(executeAt: Date, ...args: any[]) {
+        if(!this.#scheduler)
+            throw new Error('No scheduler provided. Define a scheduler in the config to use \'scheduleCommand\'.');
+        this.#scheduler.schedule(executeAt, args);
+    }
+
     async executeQuery<
         TClass extends typeof ReadModel,
         THandler extends keyof InstanceType<TClass>
@@ -267,7 +294,7 @@ class Woltage
         context?: any
     ): Promise<InstanceType<TClass>[THandler] extends (...args: any) => any ? ReturnType<InstanceType<TClass>[THandler]> : never>;
     async executeQuery(readModelName: string, handlerName: string, query: any, context?: any): Promise<unknown>;
-    async executeQuery(readModelName: ReadModel | string, handlerName: string, query: any, context?: any) {
+    async executeQuery(readModelName: typeof ReadModel | string, handlerName: string, query: any, context?: any) {
         if(typeof readModelName !== 'string')
             readModelName = readModelName.toString();
         const readModel = this.#readModelMap[ReadModel.getName(readModelName)];

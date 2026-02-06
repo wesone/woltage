@@ -7,9 +7,9 @@ import {
 } from '../adapters/EventStore.ts';
 import EventRegistry from '../EventRegistry.ts';
 import {readStore, executionStorage} from '../localStorages.ts';
-import validate from '../validate.ts';
+import validate from '../utils/validate.ts';
 
-type AggregateProjector<TState = any> = {
+export type AggregateProjector<TState = any> = {
     /**
      * To set an initial state.
      */
@@ -22,17 +22,28 @@ type AggregateProjector<TState = any> = {
     [eventIdentity: string]: (state: TState, event: Event) => TState
 };
 
-type CommandContext = {
+export type CommandContext<TContext extends object = Record<string, never>> = TContext & {
     aggregateId: string,
     aggregateVersion: number
 };
 
-type Command<TState, TPayload extends z.ZodType = any> = (state: TState, payload: z.infer<TPayload>, context: CommandContext) => Promise<Event | Event[] | void> | Event | Event[] | void;
+export type StateUpdateConfig = {
+    /**
+     * If `true`, optimistic concurrency control will be disabled for this operation.
+     * The event will be appended regardless of the state being outdated.
+     */
+    force: boolean,
+    event: Event | Event[]
+};
 
-type CommandOptions = {
+export type StateUpdate = Event | Event[] | StateUpdateConfig | void;
+
+export type Command<TState, TPayload extends z.ZodType = any> = (state: TState, payload: z.infer<TPayload>, context: CommandContext) => Promise<StateUpdate> | StateUpdate;
+
+export type CommandOptions = {
     /**
      * The name of the command.
-     * Set this if the command function has no name or if you want to override it's name.
+     * Set this if the command function has no name or if you want to override its name.
      */
     name?: string
 };
@@ -125,7 +136,7 @@ class Aggregate<TState = any>
 
         const {eventStore, context} = readStore(executionStorage);
         const {state, revision, version: aggregateVersion} = await this.#getStatus(aggregateId);
-        let events = await command(
+        const stateUpdate = await command(
             state,
             payload,
             Object.freeze({
@@ -134,11 +145,14 @@ class Aggregate<TState = any>
                 aggregateVersion
             })
         );
-        if(!events)
+        if(!stateUpdate)
             return;
 
-        if(!Array.isArray(events))
-            events = [events];
+        const {event, force} = !('event' in stateUpdate)
+            ? {force: false, event: stateUpdate}
+            : stateUpdate;
+
+        const events = !Array.isArray(event) ? [event] : event;
         events.forEach(event => {
             event.aggregateId = aggregateId;
         });
@@ -146,7 +160,7 @@ class Aggregate<TState = any>
             this.name,
             aggregateId,
             events,
-            revision
+            force ? undefined : revision
         );
     }
 }

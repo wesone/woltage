@@ -3,6 +3,7 @@ import type Event from './Event.ts';
 import type {IEventStore} from './adapters/EventStore.ts';
 import type ReadModel from './read/ReadModel.ts';
 import type ProjectionMap from './ProjectionMap.ts';
+import type {Woltage} from './Woltage.ts';
 
 export function readStore<T>(asyncLocalStorage: AsyncLocalStorage<T>)
 {
@@ -12,17 +13,20 @@ export function readStore<T>(asyncLocalStorage: AsyncLocalStorage<T>)
     return store;
 }
 
-type ProjectionStore = {
+export type ProjectionStore = {
     isReplaying: boolean,
     currentEvent: Event,
-    eventStore: IEventStore
+    eventStore: IEventStore,
+    scheduleCommand: Woltage['scheduleCommand'],
 };
+
 export const projectionStorage = new AsyncLocalStorage<ProjectionStore>();
 
-type ExecutionStore = {
+export type ExecutionStore = {
     eventStore: IEventStore,
     readModelMap: Record<string, ReadModel>,
     projectionMap: ProjectionMap['activeProjectionMap'],
     context?: any
 };
+
 export const executionStorage = new AsyncLocalStorage<ExecutionStore>();

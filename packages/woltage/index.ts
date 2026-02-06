@@ -8,18 +8,21 @@ export {default as UnalteredError} from './src/errors/UnalteredError.ts';
 export {default as UnauthorizedError} from './src/errors/UnauthorizedError.ts';
 
 export * from './src/adapters/EventStore.ts';
+export * from './src/adapters/Scheduler.ts';
 export * from './src/adapters/Store.ts';
 
 export type * from './src/Event.ts';
 export {default as Event} from './src/Event.ts';
-export {default as Aggregate} from './src/write/Aggregate.ts';
 export type * from './src/write/Aggregate.ts';
+export {default as Aggregate} from './src/write/Aggregate.ts';
 export {default as Projector} from './src/read/Projector.ts';
 export {default as ReadModel} from './src/read/ReadModel.ts';
-export {default as sideEffect} from './src/read/sideEffect.ts';
-export {default as emit} from './src/write/emit.ts';
 
-export {default as validate} from './src/validate.ts';
+export {default as sideEffect} from './src/sideEffects/sideEffect.ts';
+export {default as emit} from './src/sideEffects/emit.ts';
+export {default as scheduleCommand} from './src/sideEffects/scheduleCommand.ts';
+
+export {default as validate} from './src/utils/validate.ts';
 
 export type * from './src/WoltageConfig.ts';
 export {default, type Woltage} from './src/Woltage.ts';

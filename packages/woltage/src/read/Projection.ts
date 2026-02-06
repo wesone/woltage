@@ -1,9 +1,10 @@
 import z from 'zod';
 import type Projector from './Projector.ts';
 import {projectionStorage} from '../localStorages.ts';
-import Event from '../Event.ts';
+import type Event from '../Event.ts';
 import type {IStore} from '../adapters/Store.ts';
-import {IEventStore, START, SubscriptionStream} from '../adapters/EventStore.ts';
+import {type IEventStore, type SubscriptionStream, START} from '../adapters/EventStore.ts';
+import type {Woltage} from '../Woltage.ts';
 
 const configPrefix = '_woltage';
 
@@ -28,6 +29,7 @@ class Projection
         return `${name}@${version}`;
     }
 
+    readonly #woltage: Woltage;
     readonly #eventStore: IEventStore;
     readonly id: string;
     readonly name: string;
@@ -39,7 +41,15 @@ class Projection
     #latestPosition: bigint = -1n;
     #subscription?: SubscriptionStream;
 
-    constructor(eventStore: IEventStore, name: string, version: number, ProjectorClass: typeof Projector, store: IStore<typeof configDefinition>) {
+    constructor(
+        woltage: Woltage,
+        eventStore: IEventStore,
+        name: string,
+        version: number,
+        ProjectorClass: typeof Projector,
+        store: IStore<typeof configDefinition>
+    ) {
+        this.#woltage = woltage;
         this.#eventStore = eventStore;
         this.id = Projection.getId(name, version);
         this.name = name;
@@ -98,12 +108,16 @@ class Projection
             {
                 isReplaying: this.isReplaying,
                 currentEvent: event,
-                eventStore: this.#eventStore
+                eventStore: this.#eventStore,
+                scheduleCommand: this.#woltage.scheduleCommand
             },
             () => this.projector.onEvent(event)
         );
         // if the framework should handle idempotency, we would need to update the projection and save the handled position transactionally
-        await this.projector.store.tables[configPrefix].set({projectionId: this.id, position: event.position});
+        await this.projector.store.tables[configPrefix].set({
+            projectionId: this.id,
+            position: event.position
+        });
     }
 
     async stop() {
