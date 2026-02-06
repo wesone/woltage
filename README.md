@@ -32,7 +32,7 @@ Install the `woltage` package:
 $ npm i woltage
 ```
 
-Woltage relies on [adapters](#adapter) for handling data. You can build your own adapters that implement the appropriate interfaces ([`IEventStore`](#event-store), [`IStore`](#store)) or you can use existing adapters.
+Woltage relies on [adapters](#adapter) for handling data. You can build your own adapters that implement the appropriate interfaces ([`IEventStore`](#event-store), [`IStore`](#store), ...) or you can use existing adapters.
 For example:
 ```sh
 $ npm i @woltage/eventstore-kurrentdb @woltage/store-redis @woltage/store-mongodb
@@ -121,8 +121,10 @@ Property | Type | Description
 [internalStore](#store) | `{adapter: IStore, args?: any[]}` | A store adapter that is used to store internal data.
 [stores?](#store) | `Record<string, {adapter: IStore, args?: any[]}>` | A list of store adapters that can be used for projections. The keys are arbitrary names for the adapters.
 autostart? | `boolean` | Boolean indicating if Woltage should start automatically after creation. Use [`woltage.start()`](#start) to start manually.<br>Default: `true`
+scheduler? | `{adapter: IScheduler, args?: any[]}` | If the application needs to schedule commands, a scheduler is needed. If no scheduler is provided, [`woltage.scheduleCommand()`](#schedulecommand) is not available.
 
-> \* Important: if the directory (or a subdirectory) contains other modules, these modules will be imported too which could lead to side effects.
+> \* Important:\
+if the directory (or a subdirectory) contains other modules, these modules will be imported too which could lead to side effects.
 
 ## Event
 
@@ -219,7 +221,8 @@ export default class Event<TPayload extends z.ZodType> extends WoltageEvent<TPay
     }
 }
 ```
-> Important: the constructor will also be called for existing serialized events. So you need to differentiate between the creation of a new event and the instantiation of an existing event.
+> Important:\
+The constructor will also be called for existing serialized events. So you need to differentiate between the creation of a new event and the instantiation of an existing event.
 
 And let every event class extend from that class:
 ```typescript
@@ -346,9 +349,12 @@ To register a command use the `registerCommand` method of the aggregate.
 
 The command handler has the form:
 
-`(state: any, payload: any, context: {aggregateId: string}) => Promise<Event | Event[] | void> | Event | Event[] | void;`
+`(state: any, payload: any, context: {aggregateId: string, aggregateVersion: number, ...}) => Promise<Event | Event[] | {force: boolean, event: Event | Event[]} | void> | Event | Event[] | {force: boolean, event: Event | Event[]} | void;`
 
-> Important: Optimistic Concurrency Control is used to handle the parallel execution of commands. If two commands run in parallel for the same aggregate ID, both start with the same state but one command may add a new event and the other one would then operate with an outdated state. With the optimistic concurrency control, that other command will fail.
+> Important:\
+Optimistic Concurrency Control is used to handle the parallel execution of commands. If two commands run in parallel for the same aggregate ID, both start with the same state but one command may add a new event and the other one would then operate with an outdated state. With the optimistic concurrency control, that other command will fail.\
+\
+To disable optimistic concurrency control, the command handler may return an object with the `force` property set to `true`.
 
 ### Using Read Models
 
@@ -390,7 +396,8 @@ userAggregate.registerCommand(
 ```
 Use the static `get` method of the read model's class to retrieve the runtime read model instance.
 
-> Important: ReadModelClass.get() only works inside a Woltage context. When you want to use the read model outside of Woltage, use [`woltage.executeQuery`](#executequery) instead.
+> Important:\
+ReadModelClass.get() only works inside a Woltage context. When you want to use the read model outside of Woltage, use [`woltage.executeQuery`](#executequery) instead.
 
 ## Projection
 
@@ -441,7 +448,8 @@ export default class UserProjector extends Projector<typeof schema>
 }
 ```
 
-> Important: Woltage allows for Polyglot Persistence. When using TypeScript, you can redeclare the store type and use the adapter specific features along with the methods of the store interface.
+> Important:\
+Woltage allows for Polyglot Persistence. When using TypeScript, you can redeclare the store type and use the adapter specific features along with the methods of the store interface.
 
 ```typescript
 import {Projector, z} from 'woltage';
@@ -483,7 +491,8 @@ export default class UserProjector extends Projector<typeof schema>
 }
 ```
 
-> Important: when you add a projection, make sure to use a store adapter that is compatible with the projector.
+> Important:\
+When you add a projection, make sure to use a store adapter that is compatible with the projector.
 
 ### Side Effect
 
@@ -607,7 +616,8 @@ However, if you want to call the handler via [`woltage.executeQuery`](#executequ
 
 You can optionally add read model methods to the read model's schema registry. When doing so, the `query` parameter of the read model method is automatically validated when called via [`woltage.executeQuery`](#executequery), so the method itself does not need to handle the validation.
 
-> Important: the schemaRegistry is not used when the read model was accessed through `ReadModelClass.get()`.
+> Important:\
+The schemaRegistry is not used when the read model was accessed through `ReadModelClass.get()`.
 
 ## Adapter
 
@@ -622,6 +632,10 @@ An event store adapter needs to implement the `IEventStore` interface.
 You can use many different store technologies inside the same application. So the used database for a projection can depend on the data the projection should handle. For example, a simple projection that is frequently read may use a Redis, while a projection that needs to allow complex querying could use a MongoDB.
 A store adapter needs to implement the `IStore` interface but can have additional functionality.
 
+### Scheduler
+
+A scheduler adapter that implements the `IScheduler` interface is used to handle the execution of scheduled commands.
+
 ## Woltage Instance
 
 
@@ -635,6 +649,16 @@ A store adapter needs to implement the `IStore` interface but can have additiona
 `async executeCommand(commandInfo: CommandInfo, aggregateId: string, payload: any, context?: any): Promise<any>`
 
 To execute a [command](#command) of an aggregate. If the optional `context` parameter was provided, it will be added to the context parameter of the command.
+
+### scheduleCommand
+
+`async scheduleCommand(executeAt: Date, aggregateName: string, aggregateId: string, commandName: string, payload: any, context?: any): Promise<void>`
+
+`async scheduleCommand(executeAt: Date, aggregate: Aggregate, aggregateId: string, commandName: string, payload: any, context?: any): Promise<void>`
+
+`async scheduleCommand(executeAt: Date, commandInfo: CommandInfo, aggregateId: string, payload: any, context?: any): Promise<any>`
+
+To execute a [command](#command) of an aggregate at a specific time in the future. If the optional `context` parameter was provided, it will be added to the context parameter of the command. For this to work a `scheduler` must be provided via 
 
 ### executeQuery
 
@@ -674,7 +698,8 @@ To get a specific projection.
 
 To remove a projection. You can not remove a projection that is currently active unless you set the optional `force` parameter to `true`.
 
-> Important: removing a projection will not delete it's data from the store.
+> Important:\
+Removing a projection will not delete its data from the store.
 
 ### start
 
