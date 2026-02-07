@@ -124,7 +124,7 @@ autostart? | `boolean` | Boolean indicating if Woltage should start automaticall
 scheduler? | `{adapter: IScheduler, args?: any[]}` | If the application needs to schedule commands, a scheduler is needed. If no scheduler is provided, [`woltage.scheduleCommand()`](#schedulecommand) is not available.
 
 > \* Important:\
-if the directory (or a subdirectory) contains other modules, these modules will be imported too which could lead to side effects.
+If the directory (or a subdirectory) contains other modules, these modules will be imported too which could lead to side effects.
 
 ## Event
 
@@ -658,7 +658,7 @@ To execute a [command](#command) of an aggregate. If the optional `context` para
 
 `async scheduleCommand(executeAt: Date, commandInfo: CommandInfo, aggregateId: string, payload: any, context?: any): Promise<any>`
 
-To execute a [command](#command) of an aggregate at a specific time in the future. If the optional `context` parameter was provided, it will be added to the context parameter of the command. For this to work a `scheduler` must be provided via 
+To execute a [command](#command) of an aggregate at a specific time in the future. If the optional `context` parameter was provided, it will be added to the context parameter of the command. For this to work a `scheduler` must be provided via [config](#config).
 
 ### executeQuery
 
