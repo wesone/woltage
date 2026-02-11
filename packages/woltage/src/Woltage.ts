@@ -15,13 +15,15 @@ import {executionStorage} from './localStorages.ts';
 import type {WoltageConfig} from './WoltageConfig.ts';
 import type {IScheduler} from './adapters/Scheduler.ts';
 
-export type AggregateMap = {[aggregateName: string]: Aggregate};
+export type AggregateMap = {[aggregateType: string]: Aggregate};
 
 export type ProjectorMap = {
     [projectorName: string]: {
         [version: number]: typeof Projector
     }
 };
+
+export type Context = Record<string, unknown>;
 
 const projectionConfigSchema = {
     projections: {
@@ -54,9 +56,9 @@ class Woltage
 {
     static #constructAggregateMap(aggregates: Aggregate[]) {
         return aggregates.reduce((map, aggregate) => {
-            if(map[aggregate.name])
-                throw new Error(`Duplicate aggregate found. Aggregate '${aggregate.name}' already exists.`);
-            map[aggregate.name] = aggregate;
+            if(map[aggregate.type])
+                throw new Error(`Duplicate aggregate found. Aggregate '${aggregate.type}' already exists.`);
+            map[aggregate.type] = aggregate;
             return map;
         }, {} as AggregateMap);
     }
@@ -112,46 +114,52 @@ class Woltage
     }
 
     async #init() {
-        registerEventClasses(
-            await this.#loadModules(
+        await Promise.all([
+            this.#loadModules(
                 this.config.eventClasses,
                 module => module.prototype instanceof Event
             )
-        );
-
-        this.#aggregateMap = Woltage.#constructAggregateMap(
-            await this.#loadModules(
+                .then(eventClasses => registerEventClasses(eventClasses)),
+            this.#loadModules(
                 this.config.aggregates,
                 module => module instanceof Aggregate
             )
-        );
-
-        this.#projectorMap = Woltage.#constructProjectorMap(
-            await this.#loadModules(
+                .then(aggregates => this.#aggregateMap = Woltage.#constructAggregateMap(aggregates))
+                .then(aggregateMap => Promise.all(
+                    Object.values(aggregateMap)
+                        .map(async ({snapshotter, options}) => {
+                            snapshotter.configure(this.config.snapshots, options.snapshots);
+                            if(snapshotter.config)
+                                await snapshotter.setStore(createStore(
+                                    snapshotter.config.store || this.config.internalStore,
+                                    '_woltage_snapshots'
+                                ));
+                        })
+                )),
+            this.#loadModules(
                 this.config.projectorClasses,
                 module => module.prototype instanceof Projector
             )
-        );
-
-        this.#readModelMap = Object.fromEntries(
-            (
-                await this.#loadModules(
-                    this.config.readModelClasses,
-                    module => module.prototype instanceof ReadModel
-                )
+                .then(projectorClasses => this.#projectorMap = Woltage.#constructProjectorMap(projectorClasses)),
+            this.#loadModules(
+                this.config.readModelClasses,
+                module => module.prototype instanceof ReadModel
             )
-                .map(ReadModelClass => [ReadModelClass.toString(), new (ReadModelClass as any)()])
-        );
+                .then(readModelClasses => {
+                    this.#readModelMap = Object.fromEntries(
+                        readModelClasses
+                            .map(ReadModelClass => [ReadModelClass.toString(), new (ReadModelClass as any)()])
+                    );
+                })
+        ]);
 
-        await this.#store.connect();
+        await this.#store.connect()
+            .then(() => this.#loadProjections());
 
-        await this.#loadProjections();
-
-        if(this.#scheduler)
-            this.#scheduler.subscribe(async (executeAt, data) => {
-                await this.executeCommand(...(data as Parameters<Woltage['executeCommand']>))
-                    .catch(console.info);
-            });
+        await this.#scheduler?.subscribe(async (executeAt, data) => {
+            await this.executeCommand(...(data as Parameters<Woltage['executeCommand']>))
+                .catch(console.info);
+        });
     }
 
     async #loadProjections() {
@@ -240,7 +248,7 @@ class Woltage
         await this.#saveProjections();
     }
 
-    async #execute(routine: () => unknown, context?: any) {
+    async #execute(routine: () => unknown, context?: Context) {
         return await executionStorage.run(
             {
                 eventStore: this.#eventStore,
@@ -252,35 +260,36 @@ class Woltage
         );
     }
 
-    async executeCommand<TState, TPayload extends z.ZodType = any>(commandInfo: CommandInfo<TState, TPayload>, aggregateId: string, payload: any, context?: any): Promise<void>
-    async executeCommand(aggregate: Aggregate, aggregateId: string, commandName: string, payload: any, context?: any): Promise<void>
-    async executeCommand(aggregateName: string, aggregateId: string, commandName: string, payload: any, context?: any): Promise<void>
-    async executeCommand(aggregateName: string | Aggregate | CommandInfo<any>, aggregateId: string, commandName: string, payload: any, context?: any) {
-        if(typeof aggregateName !== 'string')
+    async executeCommand<TState, TPayload extends z.ZodType = any>(commandInfo: CommandInfo<TState, TPayload>, aggregateId: string, payload: any, context?: Context): Promise<void>
+    async executeCommand(aggregate: Aggregate, aggregateId: string, commandName: string, payload: any, context?: Context): Promise<void>
+    async executeCommand(aggregateType: string, aggregateId: string, commandName: string, payload: any, context?: Context): Promise<void>
+    async executeCommand(aggregateType: string | Aggregate | CommandInfo<any>, aggregateId: string, commandName: string, payload: any, context?: any) {
+        if(typeof aggregateType !== 'string')
         {
-            if('aggregate' in aggregateName) // CommandInfo
+            if('aggregate' in aggregateType) // CommandInfo
             {
-                const commandInfo = aggregateName;
+                const commandInfo = aggregateType;
                 context = payload;
                 payload = commandName;
                 commandName = commandInfo.name;
-                aggregateName = commandInfo.aggregate.name;
+                aggregateType = commandInfo.aggregate.type;
             }
             else // Aggregate
-                aggregateName = aggregateName.name;
+                aggregateType = aggregateType.type;
         }
-        const aggregate = this.#aggregateMap[aggregateName];
+        const aggregate = this.#aggregateMap[aggregateType];
         if(!aggregate)
-            throw new NotFoundError(`Aggregate '${aggregateName}' not found.`);
+            throw new NotFoundError(`Aggregate '${aggregateType}' not found.`);
         await this.#execute(() => aggregate.executeCommand(aggregateId, commandName, payload), context);
     }
 
-    async scheduleCommand<TState, TPayload extends z.ZodType = any>(executeAt: Date, commandInfo: CommandInfo<TState, TPayload>, aggregateId: string, payload: any, context?: any): Promise<void>
-    async scheduleCommand(executeAt: Date, aggregate: Aggregate, aggregateId: string, commandName: string, payload: any, context?: any): Promise<void>
-    async scheduleCommand(executeAt: Date, aggregateName: string, aggregateId: string, commandName: string, payload: any, context?: any): Promise<void>
+    async scheduleCommand<TState, TPayload extends z.ZodType = any>(executeAt: Date, commandInfo: CommandInfo<TState, TPayload>, aggregateId: string, payload: any, context?: Context): Promise<void>
+    async scheduleCommand(executeAt: Date, aggregate: Aggregate, aggregateId: string, commandName: string, payload: any, context?: Context): Promise<void>
+    async scheduleCommand(executeAt: Date, aggregateType: string, aggregateId: string, commandName: string, payload: any, context?: Context): Promise<void>
     async scheduleCommand(executeAt: Date, ...args: any[]) {
         if(!this.#scheduler)
             throw new Error('No scheduler provided. Define a scheduler in the config to use \'scheduleCommand\'.');
+        //TODO handle non primitive params
         this.#scheduler.schedule(executeAt, args);
     }
 
@@ -291,9 +300,9 @@ class Woltage
         readModel: TClass,
         handlerName: THandler,
         query: InstanceType<TClass>[THandler] extends (...args: any) => any ? Parameters<InstanceType<TClass>[THandler]>[0] : never,
-        context?: any
+        context?: Context
     ): Promise<InstanceType<TClass>[THandler] extends (...args: any) => any ? ReturnType<InstanceType<TClass>[THandler]> : never>;
-    async executeQuery(readModelName: string, handlerName: string, query: any, context?: any): Promise<unknown>;
+    async executeQuery(readModelName: string, handlerName: string, query: any, context?: Context): Promise<unknown>;
     async executeQuery(readModelName: typeof ReadModel | string, handlerName: string, query: any, context?: any) {
         if(typeof readModelName !== 'string')
             readModelName = readModelName.toString();

@@ -3,9 +3,15 @@ import sideEffect from './sideEffect.ts';
 import {readStore, projectionStorage} from '../localStorages.ts';
 
 export default sideEffect(
-    async ({aggregateName, events}: {aggregateName: string, events: Event | Event[]}) => {
-        if(!Array.isArray(events))
-            events = [events];
+    async (aggregateType: string, event: Event | Event[]) => {
+        const events = !Array.isArray(event)
+            ? [event]
+            : event;
+
+        if(!events.length)
+            return;
+
+        const {eventStore} = readStore(projectionStorage);
         const eventGroups = new Map();
         for(const event of events)
         {
@@ -13,7 +19,8 @@ export default sideEffect(
                 eventGroups.set(event.aggregateId, []);
             eventGroups.get(event.aggregateId).push(event);
         }
+
         for(const [aggregateId, events] of eventGroups.entries())
-            await readStore(projectionStorage).eventStore.append(aggregateName, aggregateId, events);
+            await eventStore.append(aggregateType, aggregateId, events);
     },
 );

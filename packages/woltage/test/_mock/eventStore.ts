@@ -3,9 +3,14 @@ import {
     type AppendRevision,
     type Filter,
     type SubscribeOptions,
+    type ReadOptions,
     type IEventStore,
     type SubscriptionStream,
-    STATE_NEW
+    STATE_NEW,
+    STATE_EXISTS,
+    BACKWARDS,
+    START,
+    END
 } from '../../src/adapters/EventStore.ts';
 import Event from '../../src/Event.ts';
 import NotFoundError from '../../src/errors/NotFoundError.ts';
@@ -15,7 +20,7 @@ type MockedEventStore = IEventStore & {append: Mock<IEventStore['append']>, read
 
 class EventStore implements MockedEventStore
 {
-    state: {existingEvents: {[aggregateName: string]: Event[]}} = {
+    state: {existingEvents: {[aggregateType: string]: Event[]}} = {
         existingEvents: {}
     };
 
@@ -26,16 +31,32 @@ class EventStore implements MockedEventStore
         const state = this.state;
 
         this.read = mock.fn(
-            (aggregateName: string, aggregateId: string) => (async function* () {
-                if(!state.existingEvents[aggregateName]?.length)
+            (aggregateType: string, aggregateId: string, options?: ReadOptions) => (async function* () {
+                if(!state.existingEvents[aggregateType]?.length)
                     throw new NotFoundError();
-                const events = state.existingEvents[aggregateName]
+                const events = state.existingEvents[aggregateType]
+                    .map((event, idx) => {
+                        event.position = BigInt(idx + 1);
+                        return event;
+                    })
                     .filter(event => event.aggregateId === aggregateId);
-                let revision = 0n;
+
+                if(
+                    options?.fromRevision === START && options?.direction === BACKWARDS
+                    || options?.fromRevision === END && options?.direction !== BACKWARDS
+                )
+                    return;
+                if(typeof options?.fromRevision === 'bigint')
+                    events.splice(
+                        options?.direction === BACKWARDS ? Number(options?.fromRevision) : 0,
+                        options?.direction === BACKWARDS ? events.length : Number(options?.fromRevision) - 1
+                    );
+                if(options?.direction === BACKWARDS)
+                    events.reverse();
+
                 while(events.length)
                 {
                     const event = events.shift() as Event;
-                    revision++;
                     yield Event.fromJSON({
                         id: event.id,
                         type: event.type,
@@ -46,23 +67,24 @@ class EventStore implements MockedEventStore
                         correlationId: event.correlationId,
                         causationId: event.causationId,
                         meta: event.meta,
-                        position: 1000000n + revision
+                        position: event.position
                     }, false);
                 }
             })()
         );
 
         this.append = mock.fn(
-            (aggregateName: string, aggregateId: string, events: Event[], revision: AppendRevision) => {
-                state.existingEvents[aggregateName] ??= [];
-                const currentEvents = state.existingEvents[aggregateName].filter(event => event.aggregateId === aggregateId);
+            (aggregateType: string, aggregateId: string, events: Event[], revision?: AppendRevision) => {
+                state.existingEvents[aggregateType] ??= [];
+                const currentEvents = state.existingEvents[aggregateType].filter(event => event.aggregateId === aggregateId);
                 if(
                     revision === STATE_NEW && currentEvents.length
+                    || revision === STATE_EXISTS && !currentEvents.length
                     || (typeof revision === 'bigint' && revision < BigInt(currentEvents.length))
                 )
                     return Promise.reject(new ConflictError());
 
-                state.existingEvents[aggregateName].push(...events);
+                state.existingEvents[aggregateType].push(...events);
                 return Promise.resolve();
             }
         );
@@ -87,7 +109,7 @@ class EventStore implements MockedEventStore
         throw new Error('Method not implemented.');
     }
 
-    mock(existingEvents: {[aggregateName: string]: Event[]}) {
+    mock(existingEvents: {[aggregateType: string]: Event[]}) {
         this.state.existingEvents = existingEvents;
     }
 

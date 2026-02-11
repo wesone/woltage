@@ -10,6 +10,6 @@ const schema = z.object({
 
 export default class UserRegistered extends Event<typeof schema>
 {
-    static schema = schema;
-    static version = 1;
+    static readonly schema = schema;
+    static readonly version = 1;
 }

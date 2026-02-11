@@ -13,6 +13,7 @@ A CQRS and Event-Sourcing Framework.
     * [Aggregate Projector](#aggregate-projector)
     * [Command](#command)
     * [Using Read Models](#using-read-models)
+    * [Snapshots](#snapshots)
 * [Projection](#projection)
     * [Version](#version-1)
     * [Projector](#projector)
@@ -80,10 +81,10 @@ import express from 'express';
 
 const app = express();
 
-app.post('/:aggregateName/:aggregateId/:commandName', async (req, res) => {
-    const {aggregateName, aggregateId, commandName} = req.params;
+app.post('/:aggregateType/:aggregateId/:commandName', async (req, res) => {
+    const {aggregateType, aggregateId, commandName} = req.params;
     await woltage.executeCommand(
-        aggregateName, 
+        aggregateType, 
         aggregateId, 
         commandName, 
         req.body
@@ -113,15 +114,16 @@ To create a Woltage instance, you need to pass a config. It has the following pr
 
 Property | Type | Description
 :--- | :--- | :---
-[eventStore](#event-store) | `{adapter: IEventStore, args?: any[]}` | The event store adapter to use.
+[eventStore](#event-store) | `{adapter: typeof IEventStore, args?: any[]}` | The event store adapter to use.
 [eventClasses](#event) | `(typeof Event)[] \| string` | An array of event classes or a path to a directory to import event classes from. *
 [aggregates](#aggregate) | `Aggregate[] \| string` | An array of aggregate instances or a path to a directory to import aggregates from. *
 [projectorClasses](#projector) | `(typeof Projector)[] \| string` | An array of projector classes or a path to a directory to import projector classes from. *
 [readModelClasses?](#read-model) | `(typeof ReadModel)[] \| string` | An array of read model classes or a path to a directory to import read model classes from. *
-[internalStore](#store) | `{adapter: IStore, args?: any[]}` | A store adapter that is used to store internal data.
-[stores?](#store) | `Record<string, {adapter: IStore, args?: any[]}>` | A list of store adapters that can be used for projections. The keys are arbitrary names for the adapters.
+[internalStore](#store) | `{adapter: typeof IStore, args?: any[]}` | A store adapter that is used to store internal data.
+[stores?](#store) | `Record<string, {adapter: typeof IStore, args?: any[]}>` | A list of store adapters that can be used for projections. The keys are arbitrary names for the adapters.
+[snapshots?](#snapshots) | [`SnapshotConfig`](#snapshot-config) \| `false` | Set a snapshot config globally for all aggregates. If `false`, snapshots are not used.<br>Default: `false`
 autostart? | `boolean` | Boolean indicating if Woltage should start automatically after creation. Use [`woltage.start()`](#start) to start manually.<br>Default: `true`
-scheduler? | `{adapter: IScheduler, args?: any[]}` | If the application needs to schedule commands, a scheduler is needed. If no scheduler is provided, [`woltage.scheduleCommand()`](#schedulecommand) is not available.
+[scheduler?](#scheduler) | `{adapter: typeof IScheduler, args?: any[]}` | If the application needs to schedule commands, a scheduler is needed. If no scheduler is provided, [`woltage.scheduleCommand()`](#schedulecommand) is not available.
 
 > \* Important:\
 If the directory (or a subdirectory) contains other modules, these modules will be imported too which could lead to side effects.
@@ -141,8 +143,8 @@ const schema = z.object({
 
 export default class UserRegistered extends Event<typeof schema>
 {
-    static schema = schema;
-    static version = 1;
+    static readonly schema = schema;
+    static readonly version = 1;
 }
 ```
 
@@ -179,8 +181,8 @@ const schema = z.object({
 
 export default class OrderFulfilled extends Event<typeof schema, TMeta>
 {
-    static schema = schema;
-    static version = 1;
+    static readonly schema = schema;
+    static readonly version = 1;
 }
 ```
 ```typescript
@@ -236,8 +238,8 @@ const schema = z.object({
 
 export default class OrderFulfilled extends Event<typeof schema>
 {
-    static schema = schema;
-    static version = 1;
+    static readonly schema = schema;
+    static readonly version = 1;
 }
 ```
 
@@ -399,6 +401,32 @@ Use the static `get` method of the read model's class to retrieve the runtime re
 > Important:\
 ReadModelClass.get() only works inside a Woltage context. When you want to use the read model outside of Woltage, use [`woltage.executeQuery`](#executequery) instead.
 
+### Snapshots
+
+Every event that belongs to an aggregate stream will be loaded and processed by the [aggregate projector](#aggregate-projector) whenever the state of that aggregate stream is calculated. If the amount of events to read is very high (aggregate is not short-lived) or if the aggregate is frequently accessed, loading and processing all the relevant events everytime could lead to performance issues.
+
+Snapshots can help to reduce this workload and allow to read a previously calculated state. Since there are different scenarios where snapshots could come into play, you can set the snapshot behavior [globally](#config) or on a per aggregate basis (which takes precedence over the global settings).
+
+#### Snapshot Config
+
+Property | Type | Description
+:--- | :--- | :---
+[store?](#store) | `{adapter: typeof IStore, args?: any[]}` \| `false` | The store adapter used to store snapshots. If no store was provided, the internal store (see [`config.internalStore`](#config)) will be used.
+eventCount? | `number` \| `false` | Create a snapshot every `<eventCount>` events (e.g. every 100 events).
+duration? | `number` \| `false` | Create a snapshot as soon as the duration in milliseconds to build the state, exceeds `<duration>` (e.g. when loading takes longer than 500 ms).
+
+The snapshot strategies (eventCount, duration) can be combined. Whichever happens first, will be used.
+
+The aggregate specific config will be merged with the global config. Set a property to `false` within the aggregate's snapshot config to remove it from the resulting config othwerwise the property of the global config will be used.
+
+Examples:
+Global | Aggegate | Result
+:--- | :--- | :---
+`{store: StoreA, duration: 1000}` | `{eventCount: 100}` | `{store: StoreA, duration: 1000, eventCount: 100}`
+`{eventCount: 100, duration: 500}` | `{eventCount: 42}` | `{store: internalStore, eventCount: 42, duration: 1000}` 
+`{store: StoreA, eventCount: 100}` | `{store: StoreB, duration: 500}` | `{store: StoreB, eventCount: 100, duration: 500}` 
+`{store: StoreA, eventCount: 100}` | `{store: false, eventCount: false, duration: 500}` | `{store: internalStore, duration: 500}`
+
 ## Projection
 
 A projection is used to bring the events into a form that is optimized for reading/querying. A projection has a name and a [version](#version-1) and uses a [projector](#projector). As soon as a projection was added, it will start to replay all existing events (the projection is in replay mode while doing this) and then waits for new events. To add a projection use [`woltage.addProjection`](#addprojection).
@@ -430,8 +458,8 @@ const schema = {
 
 export default class UserProjector extends Projector<typeof schema>
 {
-    static schema = schema;
-    static version = 1;
+    static readonly schema = schema;
+    static readonly version = 1;
 
     async [UserRegistered.identity](event: UserRegistered) {
         const {emails} = this.store.tables;
@@ -470,8 +498,8 @@ const schema = {
 
 export default class UserProjector extends Projector<typeof schema>
 {
-    static schema = schema;
-    static version = 1;
+    static readonly schema = schema;
+    static readonly version = 1;
 
     declare store: MongoDBStore<typeof schema>;
 
@@ -527,8 +555,8 @@ const schema = {
 
 export default class UserProjector extends Projector<typeof schema>
 {
-    static schema = schema;
-    static version = 1;
+    static readonly schema = schema;
+    static readonly version = 1;
 
     async [UserRegistered.identity](event: UserRegistered) {
         const {emails} = this.store.tables;
@@ -567,7 +595,7 @@ const sendConfirmationEmail = sideEffect(
                 aggregateId: userId,
                 payload: {errorMessage}
             });
-        await emit({aggregateName: 'user', events: event});
+        await emit('user', event);
     }
 );
 ```
@@ -642,7 +670,7 @@ A scheduler adapter that implements the `IScheduler` interface is used to handle
 
 ### executeCommand
 
-`async executeCommand(aggregateName: string, aggregateId: string, commandName: string, payload: any, context?: any): Promise<void>`
+`async executeCommand(aggregateType: string, aggregateId: string, commandName: string, payload: any, context?: any): Promise<void>`
 
 `async executeCommand(aggregate: Aggregate, aggregateId: string, commandName: string, payload: any, context?: any): Promise<void>`
 
@@ -652,7 +680,7 @@ To execute a [command](#command) of an aggregate. If the optional `context` para
 
 ### scheduleCommand
 
-`async scheduleCommand(executeAt: Date, aggregateName: string, aggregateId: string, commandName: string, payload: any, context?: any): Promise<void>`
+`async scheduleCommand(executeAt: Date, aggregateType: string, aggregateId: string, commandName: string, payload: any, context?: any): Promise<void>`
 
 `async scheduleCommand(executeAt: Date, aggregate: Aggregate, aggregateId: string, commandName: string, payload: any, context?: any): Promise<void>`
 

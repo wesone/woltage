@@ -33,7 +33,7 @@ export type LocalSchedulerConfig = {
      *
      * Can be set to a number of max retries.
      *
-     * Default: false
+     * Default: `false`
      */
     retryFailedInvocations?: boolean | number
 }

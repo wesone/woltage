@@ -1,5 +1,5 @@
 import type Event from './Event.ts';
-import type {EventIdentity} from './Event.ts';
+import type {EventIdentityData} from './Event.ts';
 import EventCaster from './EventCaster.ts';
 
 type HandlerMap = {
@@ -23,7 +23,7 @@ export default class EventRegistry
             .reduce((map, eventIdentity) => {
                 try
                 {
-                    const {type, version} = JSON.parse(eventIdentity) as EventIdentity;
+                    const {type, version} = JSON.parse(eventIdentity) as EventIdentityData;
                     if(type.length && !isNaN(version))
                     {
                         map[type] ??= {};

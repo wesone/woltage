@@ -1,13 +1,14 @@
+import type {IStore} from '../adapters/Store.ts';
 import type {AdapterConfig, StoreAdapterConfig} from '../WoltageConfig.ts';
 
-export function constructAdapter<T extends new(...args: any) => any>(config: AdapterConfig<T>)
+export function constructAdapter<T extends new(...args: any) => any>(config: AdapterConfig<T>): InstanceType<T>
 {
     return new config.adapter(...(config.args ?? []));
 }
 
-export function createStore(config: StoreAdapterConfig, prefix: string)
+export function createStore<TAdapter extends new(...args: any) => IStore>(config: StoreAdapterConfig<TAdapter>, prefix: string)
 {
-    const instance = constructAdapter(config);
+    const instance = constructAdapter<TAdapter>(config);
     instance.prefix = prefix;
     return instance;
 }

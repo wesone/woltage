@@ -23,10 +23,12 @@ type EventData<TPayload extends z.ZodType, TMeta = any> = NewEventData<TPayload>
 
 export type EventConstructionData<TPayload extends z.ZodType, TMeta = any> = EventData<TPayload, TMeta> | NewEventData<TPayload, TMeta>;
 
-export type EventIdentity = {
-    type: string,
-    version: number,
+export type EventIdentityData<T extends typeof Event = any> = {
+    type: T['type'],
+    version: T['version'],
 }
+
+export type EventIdentity<T extends typeof Event = any> = `{"type":"${T['type']}","version":${T['version']}}`;
 
 export default class Event<TPayload extends z.ZodType = any, TMeta = any> implements EventData<TPayload, TMeta>
 {
@@ -36,8 +38,8 @@ export default class Event<TPayload extends z.ZodType = any, TMeta = any> implem
      */
     declare ['constructor']: typeof Event;
 
-    static schema: z.ZodType = z.any();
-    static version: number = -1;
+    static readonly schema: z.ZodType = z.any();
+    static readonly version: number = -1;
 
     static toString() {
         return this.name.replace(/\W+/g, ' ')
@@ -53,8 +55,8 @@ export default class Event<TPayload extends z.ZodType = any, TMeta = any> implem
     static get identity() {
         return JSON.stringify({
             type: this.type,
-            version: this.version,
-        });
+            version: this.version
+        }) as EventIdentity; // passing `this` as the generic type argument to EventIdentity is currently not possible
     }
 
     static validate(payload: unknown) {

@@ -22,9 +22,9 @@ const importHandlers = async (dirPath: string) => {
 };
 
 export default async (app: Application) => {
-    app.post('/:aggregateName/:aggregateId/:commandName', async (req, res) => {
-        const {aggregateName, aggregateId, commandName} = req.params;
-        await req.woltage.executeCommand(aggregateName, aggregateId, commandName, req.body);
+    app.post('/:aggregateType/:aggregateId/:commandName', async (req, res) => {
+        const {aggregateType, aggregateId, commandName} = req.params;
+        await req.woltage.executeCommand(aggregateType, aggregateId, commandName, req.body);
         res.status(200).end();
     });
 

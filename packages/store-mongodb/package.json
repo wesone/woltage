@@ -18,11 +18,11 @@
     "prepack": "npm run build"
   },
   "peerDependencies": {
-    "mongodb": "^7.0.0",
-    "woltage": "^1.0.3"
+    "mongodb": "^7.1.0",
+    "woltage": "^1.2.0"
   },
   "devDependencies": {
-    "typescript": "^5.8.3"
+    "typescript": "^5.9.3"
   },
   "files": [
     "/dist"
