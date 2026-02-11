@@ -423,7 +423,7 @@ Examples:
 Global | Aggegate | Result
 :--- | :--- | :---
 `{store: StoreA, duration: 1000}` | `{eventCount: 100}` | `{store: StoreA, duration: 1000, eventCount: 100}`
-`{eventCount: 100, duration: 500}` | `{eventCount: 42}` | `{store: internalStore, eventCount: 42, duration: 1000}` 
+`{eventCount: 100, duration: 500}` | `{eventCount: 42}` | `{store: internalStore, eventCount: 42, duration: 500}` 
 `{store: StoreA, eventCount: 100}` | `{store: StoreB, duration: 500}` | `{store: StoreB, eventCount: 100, duration: 500}` 
 `{store: StoreA, eventCount: 100}` | `{store: false, eventCount: false, duration: 500}` | `{store: internalStore, duration: 500}`
 
