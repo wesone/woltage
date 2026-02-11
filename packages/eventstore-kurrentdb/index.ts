@@ -76,8 +76,8 @@ export default class KurrentDBEventStore implements IEventStore
         await this.#client.dispose();
     }
 
-    #getStreamName(aggregateName: string, aggregateId: string) {
-        return `${aggregateName}-${aggregateId}`;
+    #getStreamName(aggregateType: string, aggregateId: string) {
+        return `${aggregateType}-${aggregateId}`;
     }
 
     #serializeEvent(event: Event) {
@@ -125,7 +125,7 @@ export default class KurrentDBEventStore implements IEventStore
         }, false);
     }
 
-    read(aggregateName: string, aggregateId: string, options?: ReadOptions) {
+    read(aggregateType: string, aggregateId: string, options?: ReadOptions) {
         const opts: ReadStreamOptions = {};
         if(options?.fromRevision)
         {
@@ -136,7 +136,7 @@ export default class KurrentDBEventStore implements IEventStore
         if(options?.direction)
             opts.direction = CONSTANTS[options.direction];
 
-        const stream = this.#client.readStream(this.#getStreamName(aggregateName, aggregateId), opts);
+        const stream = this.#client.readStream(this.#getStreamName(aggregateType, aggregateId), opts);
         const deserializeEvent = this.#deserializeEvent.bind(this);
         return (async function* () {
             try
@@ -161,11 +161,11 @@ export default class KurrentDBEventStore implements IEventStore
         })();
     }
 
-    async append(aggregateName: string, aggregateId: string, events: Event[], revision?: AppendRevision) {
+    async append(aggregateType: string, aggregateId: string, events: Event[], revision?: AppendRevision) {
         try
         {
             await this.#client.appendToStream(
-                this.#getStreamName(aggregateName, aggregateId),
+                this.#getStreamName(aggregateType, aggregateId),
                 events.map(event => this.#serializeEvent(event)),
                 {
                     streamState: typeof revision === 'string'
@@ -177,7 +177,7 @@ export default class KurrentDBEventStore implements IEventStore
         catch(e)
         {
             if(e instanceof WrongExpectedVersionError)
-                throw new ConflictError(`State of ${aggregateName} aggregate ${aggregateId} changed in the meantime.`);
+                throw new ConflictError(`State of ${aggregateType} aggregate ${aggregateId} changed in the meantime.`);
             throw e;
         }
     }

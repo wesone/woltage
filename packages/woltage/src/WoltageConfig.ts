@@ -5,6 +5,7 @@ import type {IScheduler} from './adapters/Scheduler.ts';
 import type Projector from './read/Projector.ts';
 import type ReadModel from './read/ReadModel.ts';
 import type Aggregate from './write/Aggregate.ts';
+import type {SnapshotConfig} from './write/Snapshotter.ts';
 
 export type AdapterConfig<T extends new (...args: any) => any = any> = {
     adapter: T,
@@ -24,7 +25,7 @@ export type WoltageConfig = {
      *
      * Important: if the directory (or a subdirectory) contains other modules, these modules will be imported too which could lead to side effects.
      */
-    eventClasses: (typeof Event)[] | string
+    eventClasses: (typeof Event)[] | string,
     /**
      * An array of aggregate instances or a path to a directory to import aggregates from.
      *
@@ -50,11 +51,17 @@ export type WoltageConfig = {
     /**
      * A list of store adapters that can be used for projections. The keys are arbitrary names for the adapters.
      */
-    stores?: Record<string, StoreAdapterConfig>
+    stores?: Record<string, StoreAdapterConfig>,
+    /**
+     * Set a snapshot config globally for all aggregates. If `false`, snapshots are not used.
+     *
+     * Default: `false`
+     */
+    snapshots?: SnapshotConfig | false,
     /**
      * Boolean indicating if Woltage should start automatically after creation. Use `woltage.start()` to start manually.
      *
-     * Default: true
+     * Default: `true`
      */
     autostart?: boolean,
     /**

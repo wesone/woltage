@@ -15,14 +15,15 @@
     "build": "npx tsc -p tsconfig.json",
     "test": "node --test --experimental-test-coverage --test-coverage-exclude=test/**/* 'test/**/*.test.*'",
     "test-watch": "node --watch --test 'test/**/*.test.*'",
+    "test-html": "npx c8 --reporter=html npm run test",
     "prepack": "(npm run build) && (cp ../../README.md ./)",
     "postpack": "rm README.md"
   },
   "peerDependencies": {
-    "zod": "^4.3.5"
+    "zod": "^4.3.6"
   },
   "devDependencies": {
-    "typescript": "^5.8.3"
+    "typescript": "^5.9.3"
   },
   "files": [
     "/dist"

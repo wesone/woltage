@@ -8,8 +8,8 @@ class Projector<Definitions extends TableDefinitionMap>
 {
     declare ['constructor']: typeof Projector;
 
-    static schema: TableDefinitionMap;
-    static version: number;
+    static readonly schema: TableDefinitionMap;
+    static readonly version: number;
 
     static getDisplayName(name = this.name, version = this.version) {
         return `${name}@${version}`;

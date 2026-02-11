@@ -23,8 +23,8 @@ export const getEventClass = (eventType: string, version: number): typeof Event 
         static toString() {
             return eventType;
         }
-        static version = version;
-        static schema = z.unknown();
+        static readonly version = version;
+        static readonly schema = z.unknown();
     }
 );
 

@@ -31,8 +31,8 @@ const schema = {
 
 export default class UserProjector extends Projector<typeof schema>
 {
-    static schema = schema;
-    static version = 1;
+    static readonly schema = schema;
+    static readonly version = 1;
 
     declare store: MongoDBStore<typeof schema>;
 

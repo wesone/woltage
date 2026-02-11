@@ -7,6 +7,8 @@ import mockEventClass from '../_mock/mockEventClass.ts';
 import {executionStorage} from '../../src/localStorages.ts';
 import {STATE_NEW} from '../../src/adapters/EventStore.ts';
 import z from 'zod';
+import StoreMock from '../_mock/StoreMock.ts';
+import {snapshotSchema} from '../../src/write/Snapshotter.ts';
 
 describe('Aggregate', async () => {
     afterEach(() => eventStore.mockReset());
@@ -62,25 +64,28 @@ describe('Aggregate', async () => {
         const aggregate = Aggregate.create('test', {});
         const schema = z.any();
         const command = function doSomething() {};
-        assert.deepEqual(aggregate.registerCommand(schema, command), {
-            aggregate,
-            name: command.name,
-            schema,
-            command,
-            options: {}
-        });
+        assert.deepEqual(
+            aggregate.registerCommand(schema, command),
+            {
+                aggregate,
+                name: command.name,
+                schema,
+                command,
+                options: {}
+            }
+        );
     });
 
     await it('constructs aggregate state for commands', async () => {
         (executionStorage as any).enterWith({eventStore});
 
-        const aggregateName = 'test';
+        const aggregateType = 'test';
         const PetRegisteredEvent = mockEventClass('pet.registered');
         const PetRenamedEvent = mockEventClass('pet.renamed');
-        const aggregateId1 = 'uuid1';
-        const aggregateId2 = 'uuid2';
+        const aggregateId1 = 'aggregateId1';
+        const aggregateId2 = 'aggregateId2';
         eventStore.mock({
-            [aggregateName]: [
+            [aggregateType]: [
                 new PetRegisteredEvent({aggregateId: aggregateId1, payload: {name: 'Lucky'}}),
                 new PetRegisteredEvent({aggregateId: aggregateId2, payload: {name: 'Jefferson'}}),
                 new PetRenamedEvent({aggregateId: aggregateId2, payload: {name: 'Airplane'}}),
@@ -88,7 +93,7 @@ describe('Aggregate', async () => {
             ]
         });
 
-        const aggregate = Aggregate.create(aggregateName, {
+        const aggregate = Aggregate.create(aggregateType, {
             $init() {
                 return {
                     eventCount: 0,
@@ -124,18 +129,90 @@ describe('Aggregate', async () => {
         assert.deepStrictEqual(command.mock.calls[1].arguments, [expectedState2, {}, {aggregateId: aggregateId2, aggregateVersion: 2}]);
     });
 
+    await it('constructs aggregate state and uses `$all` as a fallback handler', async () => {
+        (executionStorage as any).enterWith({eventStore});
+
+        const aggregateType = 'test';
+        const PetRegisteredEvent = mockEventClass('pet.registered');
+        const PetRenamedEvent = mockEventClass('pet.renamed');
+        const aggregateId = 'aggregateId1';
+        eventStore.mock({
+            [aggregateType]: [
+                new PetRegisteredEvent({aggregateId, payload: {name: 'Lucky'}}),
+                new PetRenamedEvent({aggregateId, payload: {name: 'Slevin'}})
+            ]
+        });
+
+        const aggregate = Aggregate.create(aggregateType, {
+            $init() {
+                return {
+                    eventCount: 0,
+                };
+            },
+            $all(state) {
+                state.eventCount++;
+                return state;
+            }
+        });
+        const command = mock.fn(function doSomething() {});
+        aggregate.registerCommand(command);
+
+        await aggregate.executeCommand(aggregateId, command.name, {});
+
+        const expectedState = {
+            eventCount: 2
+        };
+        assert.deepStrictEqual(
+            command.mock.calls[0].arguments,
+            [expectedState, {}, {aggregateId, aggregateVersion: 2}]
+        );
+    });
+
+    await it('constructs aggregate state even if no handler exists', async () => {
+        (executionStorage as any).enterWith({eventStore});
+
+        const aggregateType = 'test';
+        const PetRegisteredEvent = mockEventClass('pet.registered');
+        const PetRenamedEvent = mockEventClass('pet.renamed');
+        const aggregateId = 'aggregateId1';
+        eventStore.mock({
+            [aggregateType]: [
+                new PetRegisteredEvent({aggregateId, payload: {name: 'Lucky'}}),
+                new PetRenamedEvent({aggregateId, payload: {name: 'Slevin'}})
+            ]
+        });
+
+        const aggregate = Aggregate.create(aggregateType, {
+            $init() {
+                return {
+                    eventCount: 0,
+                    name: null
+                };
+            }
+        });
+        const command = mock.fn(function doSomething() {});
+        aggregate.registerCommand(command);
+
+        await aggregate.executeCommand(aggregateId, command.name, {});
+
+        assert.deepStrictEqual(
+            command.mock.calls[0].arguments,
+            [aggregate.projector.$init?.(), {}, {aggregateId, aggregateVersion: 2}]
+        );
+    });
+
     await it('does not swallow exceptions that occur in aggregate projector', async () => {
         (executionStorage as any).enterWith({eventStore});
 
         const TestEvent = mockEventClass('test');
-        const aggregateName = 'test';
-        const aggregateId = 'uuid1';
+        const aggregateType = 'test';
+        const aggregateId = 'aggregateId1';
         eventStore.mock({
-            [aggregateName]: [
+            [aggregateType]: [
                 new TestEvent({aggregateId, payload: {}})
             ]
         });
-        const aggregate = Aggregate.create(aggregateName, {
+        const aggregate = Aggregate.create(aggregateType, {
             [TestEvent.identity]() {
                 throw new Error('Test error');
             }
@@ -152,13 +229,15 @@ describe('Aggregate', async () => {
             $init() {return initState;}
         });
         const TestEvent = mockEventClass('test');
-        const {name: commandName} = aggregate.registerCommand(function doSomething(state: any, payload: any) {
-            return new TestEvent({
-                payload: {commandValue: payload?.cmd}
-            });
-        });
+        const {name: commandName} = aggregate.registerCommand(
+            function doSomething(state: any, payload: any) {
+                return new TestEvent({
+                    payload: {commandValue: payload?.cmd}
+                });
+            }
+        );
 
-        await it('can append events', async () => {
+        await it('can append an event', async () => {
             (executionStorage as any).enterWith({eventStore});
 
             const commandPayload = {cmd: 21};
@@ -170,7 +249,7 @@ describe('Aggregate', async () => {
             assert.partialDeepStrictEqual(
                 eventStore.append.mock.calls[0].arguments,
                 [
-                    aggregate.name,
+                    aggregate.type,
                     aggregateId,
                     [{aggregateId, payload: {commandValue: commandPayload.cmd}}],
                     STATE_NEW
@@ -178,20 +257,40 @@ describe('Aggregate', async () => {
             );
         });
 
-        await it('use optimistic concurrency control per aggregate id', async () => {
+        await it('can append multiple events', async () => {
             (executionStorage as any).enterWith({eventStore});
 
+            const {name: commandName} = aggregate.registerCommand(
+                function multipleEvents(state: any, payload: any) {
+                    return [
+                        new TestEvent({
+                            payload: {commandValue: payload?.cmd}
+                        }),
+                        new TestEvent({
+                            payload: {commandValue: '2nd'}
+                        })
+                    ];
+                }
+            );
+
+            const commandPayload = {cmd: 21};
             const aggregateId = 'fourtytwo';
 
-            const results = await Promise.allSettled([
-                aggregate.executeCommand(aggregateId, commandName, {}),
-                aggregate.executeCommand('twentyone', commandName, {}),
-                aggregate.executeCommand(aggregateId, commandName, {})
-            ]);
+            await assert.doesNotReject(() => aggregate.executeCommand(aggregateId, commandName, commandPayload));
 
-            assert.strictEqual(eventStore.append.mock.callCount(), 3);
-            assert.strictEqual(results.filter(({status}) => status === 'fulfilled').length, 2);
-            assert.strictEqual(results.filter(({status}) => status === 'rejected').length, 1);
+            assert.strictEqual(eventStore.append.mock.callCount(), 1);
+            assert.partialDeepStrictEqual(
+                eventStore.append.mock.calls[0].arguments,
+                [
+                    aggregate.type,
+                    aggregateId,
+                    [
+                        {aggregateId, payload: {commandValue: commandPayload.cmd}},
+                        {aggregateId, payload: {commandValue: '2nd'}}
+                    ],
+                    STATE_NEW
+                ]
+            );
         });
 
         await it('validate payload against schema', async () => {
@@ -211,5 +310,219 @@ describe('Aggregate', async () => {
             await assert.rejects(() => aggregate.executeCommand(aggregateId, command.name, {num: '42'}));
             await assert.doesNotReject(() => aggregate.executeCommand(aggregateId, command.name, {num: 42}));
         });
+
+        await it('use optimistic concurrency control per aggregate id', async () => {
+            (executionStorage as any).enterWith({eventStore});
+
+            const aggregateId = 'fourtytwo';
+
+            const results = await Promise.allSettled([
+                aggregate.executeCommand(aggregateId, commandName, {}),
+                aggregate.executeCommand('twentyone', commandName, {}),
+                aggregate.executeCommand(aggregateId, commandName, {})
+            ]);
+
+            assert.strictEqual(eventStore.append.mock.callCount(), 3);
+            assert.strictEqual(results.filter(({status}) => status === 'fulfilled').length, 2);
+            assert.strictEqual(results.filter(({status}) => status === 'rejected').length, 1);
+        });
+
+        await it('skip optimistic concurrency control if force flag is `true`', async () => {
+            const {name: commandName} = aggregate.registerCommand(
+                function forceSomething(state: any, payload: any) {
+                    return {
+                        force: true,
+                        event: new TestEvent({
+                            payload: {commandValue: payload?.cmd}
+                        })
+                    };
+                }
+            );
+
+            (executionStorage as any).enterWith({eventStore});
+
+            const aggregateId = 'fourtytwo';
+
+            const results = await Promise.allSettled([
+                aggregate.executeCommand(aggregateId, commandName, {}),
+                aggregate.executeCommand('twentyone', commandName, {}),
+                aggregate.executeCommand(aggregateId, commandName, {})
+            ]);
+
+            assert.strictEqual(eventStore.append.mock.callCount(), 3);
+            assert.strictEqual(results.filter(({status}) => status === 'fulfilled').length, 3);
+            assert.strictEqual(results.filter(({status}) => status === 'rejected').length, 0);
+        });
+    });
+
+    await it('uses existing snapshot to prevent aggregating the whole stream', async () => {
+        (executionStorage as any).enterWith({eventStore});
+
+        const aggregateType = 'test';
+        const PetRegisteredEvent = mockEventClass('pet.registered');
+        const PetRenamedEvent = mockEventClass('pet.renamed');
+        const aggregateId = 'aggregateId1';
+        eventStore.mock({
+            [aggregateType]: [
+                new PetRegisteredEvent({aggregateId, payload: {name: 'Lucky'}}),
+                new PetRenamedEvent({aggregateId, payload: {name: 'Jefferson'}}),
+                new PetRenamedEvent({aggregateId, payload: {name: 'Airplane'}}),
+                new PetRenamedEvent({aggregateId, payload: {name: 'Slevin'}})
+            ]
+        });
+
+        const aggregate = Aggregate.create(aggregateType, {
+            $init() {
+                return {
+                    eventCount: 0,
+                    name: null
+                };
+            },
+            [PetRegisteredEvent.identity](state, event) {
+                state.eventCount++;
+                state.name = event.payload.name;
+                return state;
+            },
+            [PetRenamedEvent.identity](state, event) {
+                state.eventCount++;
+                state.name = event.payload.name;
+                return state;
+            },
+        });
+        let resultState = {};
+        const command = mock.fn(function doSomething(state) {resultState = state;});
+        aggregate.registerCommand(command);
+
+        aggregate.snapshotter.configure({eventCount: 100});
+        const storeMock = new StoreMock<typeof snapshotSchema>();
+        await aggregate.snapshotter.setStore(storeMock);
+        await aggregate.snapshotter.set({
+            aggregateId,
+            projectorVersion: 0,
+            aggregateType,
+            aggregateVersion: 2,
+            revision: 2n,
+            timestamp: Date.now(),
+            state: {
+                eventCount: 2,
+                name: 'Jefferson',
+                fromSnapshot: true
+            }
+        });
+
+        await aggregate.executeCommand(aggregateId, command.name, {});
+        assert.deepStrictEqual((resultState as any).fromSnapshot, true);
+    });
+
+    await it('skips existing snapshot if snapshot has an outdated aggregate projector version', async () => {
+        (executionStorage as any).enterWith({eventStore});
+
+        const aggregateType = 'test';
+        const PetRegisteredEvent = mockEventClass('pet.registered');
+        const PetRenamedEvent = mockEventClass('pet.renamed');
+        const aggregateId = 'aggregateId1';
+        eventStore.mock({
+            [aggregateType]: [
+                new PetRegisteredEvent({aggregateId, payload: {name: 'Lucky'}}),
+                new PetRenamedEvent({aggregateId, payload: {name: 'Jefferson'}}),
+                new PetRenamedEvent({aggregateId, payload: {name: 'Airplane'}}),
+                new PetRenamedEvent({aggregateId, payload: {name: 'Slevin'}})
+            ]
+        });
+
+        const aggregate = Aggregate.create(aggregateType, {
+            $init() {
+                return {
+                    eventCount: 0,
+                    name: null
+                };
+            },
+            [PetRegisteredEvent.identity](state, event) {
+                state.eventCount++;
+                state.name = event.payload.name;
+                return state;
+            },
+            [PetRenamedEvent.identity](state, event) {
+                state.eventCount++;
+                state.name = event.payload.name;
+                return state;
+            },
+        }, {projectorVersion: 1});
+        let resultState = {};
+        const command = mock.fn(function doSomething(state) {resultState = state;});
+        aggregate.registerCommand(command);
+
+        aggregate.snapshotter.configure({eventCount: 100});
+        const storeMock = new StoreMock<typeof snapshotSchema>();
+        await aggregate.snapshotter.setStore(storeMock);
+        await aggregate.snapshotter.set({
+            aggregateId,
+            projectorVersion: 0,
+            aggregateType,
+            aggregateVersion: 2,
+            revision: 2n,
+            timestamp: Date.now(),
+            state: {
+                eventCount: 2,
+                name: 'Jefferson',
+                fromSnapshot: true
+            }
+        });
+
+        await aggregate.executeCommand(aggregateId, command.name, {});
+        assert.deepStrictEqual((resultState as any).fromSnapshot, undefined);
+    });
+
+    await it('retries to build state from scratch if existing snapshot is corrupt and not compatible with current aggregate projector anymore', async () => {
+        (executionStorage as any).enterWith({eventStore});
+
+        const aggregateType = 'test';
+        const PetRegisteredEvent = mockEventClass('pet.registered');
+        const PetRenamedEvent = mockEventClass('pet.renamed');
+        const aggregateId = 'aggregateId1';
+        eventStore.mock({
+            [aggregateType]: [
+                new PetRegisteredEvent({aggregateId, payload: {name: 'Lucky'}}),
+                new PetRenamedEvent({aggregateId, payload: {name: 'Jefferson'}}),
+                new PetRenamedEvent({aggregateId, payload: {name: 'Airplane'}}),
+                new PetRenamedEvent({aggregateId, payload: {name: 'Slevin'}})
+            ]
+        });
+
+        const aggregate = Aggregate.create(aggregateType, {
+            $init() {
+                return {
+                    eventCount: 0
+                };
+            },
+            $all(state) {
+                if((state as any).fromSnapshot)
+                    throw new Error('Corrupt Snapshot');
+                state.eventCount++;
+                return state;
+            },
+        });
+        let resultState = {};
+        const command = mock.fn(function doSomething(state) {resultState = state;});
+        aggregate.registerCommand(command);
+
+        aggregate.snapshotter.configure({eventCount: 100});
+        const storeMock = new StoreMock<typeof snapshotSchema>();
+        await aggregate.snapshotter.setStore(storeMock);
+        await aggregate.snapshotter.set({
+            aggregateId,
+            projectorVersion: 0,
+            aggregateType,
+            aggregateVersion: 2,
+            revision: 2n,
+            timestamp: Date.now(),
+            state: {
+                eventCount: 2,
+                fromSnapshot: true
+            }
+        });
+
+        await aggregate.executeCommand(aggregateId, command.name, {});
+        assert.deepStrictEqual(resultState, {eventCount: 4});
     });
 });

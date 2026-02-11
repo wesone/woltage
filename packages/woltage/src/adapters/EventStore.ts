@@ -36,7 +36,13 @@ export const BACKWARDS = 'backwards';
 export type Direction = typeof FORWARDS | typeof BACKWARDS;
 
 export type ReadOptions = {
+    /**
+     * Default: `"start"`
+     */
     fromRevision?: ReadRevision,
+    /**
+     * Default: `"forwards"`
+     */
     direction?: Direction
 };
 
@@ -45,6 +51,9 @@ export type Filter = {
 };
 
 export type SubscribeOptions = {
+    /**
+     * Default: `"start"`
+     */
     fromRevision?: ReadRevision,
     filter?: Filter
 };
@@ -55,8 +64,8 @@ export interface IEventStore {
     connect(): Promise<void>
     close(force?: boolean): Promise<void>
 
-    read(aggregateName: string, aggregateId: string, options?: ReadOptions): AsyncIterableIterator<Event>
-    append(aggregateName: string, aggregateId: string, events: Event[], revision?: AppendRevision): Promise<void>
+    read(aggregateType: string, aggregateId: string, options?: ReadOptions): AsyncIterableIterator<Event>
+    append(aggregateType: string, aggregateId: string, events: Event[], revision?: AppendRevision): Promise<void>
     subscribe(options?: SubscribeOptions): SubscriptionStream
     getLatestPosition(filter?: Filter): Promise<bigint | null>
 };

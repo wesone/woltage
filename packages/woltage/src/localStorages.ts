@@ -3,7 +3,7 @@ import type Event from './Event.ts';
 import type {IEventStore} from './adapters/EventStore.ts';
 import type ReadModel from './read/ReadModel.ts';
 import type ProjectionMap from './ProjectionMap.ts';
-import type {Woltage} from './Woltage.ts';
+import type {Context, Woltage} from './Woltage.ts';
 
 export function readStore<T>(asyncLocalStorage: AsyncLocalStorage<T>)
 {
@@ -26,7 +26,7 @@ export type ExecutionStore = {
     eventStore: IEventStore,
     readModelMap: Record<string, ReadModel>,
     projectionMap: ProjectionMap['activeProjectionMap'],
-    context?: any
+    context?: Context
 };
 
 export const executionStorage = new AsyncLocalStorage<ExecutionStore>();

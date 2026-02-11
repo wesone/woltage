@@ -7,4 +7,4 @@ export default {
         await req.woltage.executeCommand('user', randomUUID(), 'register', req.body);
         res.status(200).end();
     }
-} as APIHandler;
+} satisfies APIHandler;

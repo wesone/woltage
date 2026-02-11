@@ -5,4 +5,4 @@ export default {
     handler: async (req, res) => {
         res.json(req.woltage.getProjections()).end();
     }
-} as APIHandler;
+} satisfies APIHandler;

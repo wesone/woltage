@@ -18,13 +18,13 @@
     "prepack": "npm run build"
   },
   "dependencies": {
-    "@kurrent/kurrentdb-client": "^1.0.1"
+    "@kurrent/kurrentdb-client": "^1.1.0"
   },
   "peerDependencies": {
-    "woltage": "^1.0.2"
+    "woltage": "^1.2.0"
   },
   "devDependencies": {
-    "typescript": "^5.8.3"
+    "typescript": "^5.9.3"
   },
   "files": [
     "/dist"
