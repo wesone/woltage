@@ -28,9 +28,9 @@ export const snapshotSchema = {
             aggregateId: z.string()
         }),
         schema: z.object({
-            projectorVersion: z.number(),
             aggregateType: z.string(),
             aggregateVersion: z.int(),
+            projectorVersion: z.number(),
             revision: z.union([z.bigint(), z.literal([STATE_NEW, STATE_EXISTS])]),
             timestamp: z.int(),
             state: z.any()
@@ -90,33 +90,53 @@ class Snapshotter
         await this.#store?.tables.snapshots.remove({aggregateId});
     }
 
-    async beginSession(aggregateId: string) {
-        if(!this.config)
-            return {
-                snapshot: null,
-                endSession: () => Promise.resolve()
-            };
+    async hydrateStatus<TState = any>(
+        initialStatus: AggregateStatus<TState>,
+        hydrator: (status :AggregateStatus<TState>) => Promise<AggregateStatus<TState>>
+    ) {
+        const status = {...initialStatus};
 
-        const config = this.config;
-        const snapshot = await this.get(aggregateId);
-        const startTime = performance.now();
-        return {
-            snapshot,
-            endSession: async (status: AggregateStatus) => {
-                if(
-                    config.duration && (performance.now() - startTime) > config.duration
-                    || config.eventCount && status.aggregateVersion % config.eventCount === 0
-                )
-                    await this.set({
-                        aggregateId,
-                        projectorVersion: status.projectorVersion,
-                        aggregateType: this.#aggregateType,
-                        aggregateVersion: status.aggregateVersion,
-                        revision: status.revision,
-                        timestamp: Date.now(),
-                        state: status.state
-                    });
+        let snapshotUsed = false;
+        if(this.config)
+        {
+            const snapshot = await this.get(status.aggregateId);
+            if(snapshotUsed = snapshot?.projectorVersion === status.projectorVersion)
+            {
+                status.state = snapshot.state;
+                status.revision = snapshot.revision;
+                status.aggregateVersion = snapshot.aggregateVersion;
             }
+        }
+
+        const startTime = performance.now();
+        let hydratedStatus;
+        try
+        {
+            hydratedStatus = await hydrator(status);
+        }
+        catch(error)
+        {
+            if(!snapshotUsed)
+                throw error;
+
+            hydratedStatus = await hydrator(initialStatus);
+            console.info(`Corrupt snapshot for ${this.#aggregateType} aggregate with aggregateId '${initialStatus.aggregateId}' detected. State was hydrated from scratch.`);
+        }
+
+        const postHydrationPromise = this.config && (
+            this.config.duration && (performance.now() - startTime) > this.config.duration
+            || this.config.eventCount && hydratedStatus.aggregateVersion % this.config.eventCount === 0
+        )
+            ? this.set({
+                ...hydratedStatus,
+                aggregateType: this.#aggregateType,
+                timestamp: Date.now(),
+            })
+            : Promise.resolve();
+
+        return {
+            ...hydratedStatus,
+            postHydrationPromise
         };
     }
 }
