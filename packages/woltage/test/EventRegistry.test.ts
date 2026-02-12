@@ -38,7 +38,7 @@ describe('EventRegistry', async () => {
         const handler1 = mock.fn();
         const TestEvent2 = mockEventClass('test.event', 2);
         const handler2 = mock.fn();
-        const TestEvent3 = mockEventClass('test.event.unknown.type', 3);
+        const TestEvent3 = mockEventClass('test.event.different.type', 3);
         const registry = new EventRegistry({
             [TestEvent1.identity]: handler1,
             [TestEvent2.identity]: handler2

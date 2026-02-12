@@ -83,8 +83,8 @@ export default class Event<TPayload extends z.ZodType = any, TMeta = any> implem
     constructor(data: EventConstructionData<TPayload, TMeta>, shouldValidate: boolean = true) {
         if(typeof this.version !== 'number' || this.version <= 0)
             throw new Error('Event\'s version property must be a number > 0.');
-        if(typeof this.constructor.schema?.parse !== 'function')
-            throw new Error(`Missing schema for event class '${this.getDisplayName()}'.`);
+        if(!(this.constructor.schema instanceof z.ZodType))
+            throw new Error(`Schema for event class '${this.getDisplayName()}' needs to be a ZodType.`);
         if('type' in data && this.type !== data.type)
             throw new Error(`Event type does not match event data ("${this.type}" not equal "${data.type}").`);
         if('version' in data && this.version !== data.version)
