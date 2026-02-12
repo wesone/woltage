@@ -20,7 +20,9 @@ export default sideEffect(
             eventGroups.get(event.aggregateId).push(event);
         }
 
+        const appendPromises = [];
         for(const [aggregateId, events] of eventGroups.entries())
-            await eventStore.append(aggregateType, aggregateId, events);
+            appendPromises.push(eventStore.append(aggregateType, aggregateId, events));
+        await Promise.all(appendPromises);
     },
 );
