@@ -8,9 +8,9 @@ import StoreMock from '../_mock/StoreMock.ts';
 describe('Snapshotter', async () => {
     const snapshot = {
         aggregateId: 'aggregateId1',
+        aggregateVersion: 1,
         projectorVersion: 0,
         aggregateType: 'test',
-        aggregateVersion: 1,
         revision: 1n,
         timestamp: Date.now(),
         state: {}
@@ -135,61 +135,64 @@ describe('Snapshotter', async () => {
         assert.strictEqual(await snapshotter.get(snapshot.aggregateId), null);
     });
 
-    describe('beginSession', async () => {
+    describe('hydrateStatus', async () => {
         const snapshotter = new Snapshotter('test');
         const storeMock = new StoreMock();
         await snapshotter.setStore(storeMock);
+        const exampleStatus = {
+            aggregateId: snapshot.aggregateId,
+            aggregateVersion: 0,
+            projectorVersion: 0,
+            state: {},
+            revision: 1n
+        };
 
         afterEach(() => {
+            // snapshotter.configure(false);
             storeMock.clear();
         });
 
-        await it('does not operate without config', async () => {
+        await it('does not load existing snapshots without config', async () => {
             const snapshotter = new Snapshotter('test');
-            const {snapshot} = await snapshotter.beginSession('aggregateId1');
+            await snapshotter.hydrateStatus(exampleStatus, async s => s);
 
-            assert.strictEqual(snapshot, null);
+            assert.strictEqual(storeMock.tables.snapshots.get.mock.callCount(), 0);
         });
 
-        await it('returns existing snapshot', async () => {
+        await it('uses existing snapshots', async () => {
             await snapshotter.set(snapshot);
             snapshotter.configure({eventCount: 100});
 
-            const {snapshot: existingSnapshot} = await snapshotter.beginSession(snapshot.aggregateId);
-            assert.strictEqual(existingSnapshot, snapshot);
+            const {postHydrationPromise, ...status} = await snapshotter.hydrateStatus(exampleStatus, async s => s);
+            await postHydrationPromise;
+
+            assert.strictEqual(status.aggregateVersion, snapshot.aggregateVersion);
         });
 
-        describe('endSession', async () => {
+        describe('hydration', async () => {
             const internalStoreKey = '{"aggregateId":"aggregateId1"}';
-            const status = {
-                state: {},
-                revision: 1n,
-                aggregateVersion: 1,
-                projectorVersion: 0
-            };
 
             await it('does not add a new snapshot if no condition was met', async () => {
                 snapshotter.configure({eventCount: 100, duration: 1000});
-                {
-                    const {endSession} = await snapshotter.beginSession(snapshot.aggregateId);
-                    assert.equal(Object.values(storeMock.tables.snapshots.records).length, 0);
-                    await endSession({
-                        ...status,
-                        aggregateVersion: 99
-                    });
-                    assert.equal(Object.values(storeMock.tables.snapshots.records).length, 0);
-                }
+
+                const {postHydrationPromise} = await snapshotter.hydrateStatus(exampleStatus, async s => ({
+                    ...s,
+                    aggregateVersion: 99
+                }));
+                await postHydrationPromise;
+
+                assert.equal(Object.values(storeMock.tables.snapshots.records).length, 0);
             });
 
             await it('adds a new snapshot if eventCount condition was met', async () => {
                 snapshotter.configure({eventCount: 100, duration: false});
                 {
-                    const {endSession} = await snapshotter.beginSession(snapshot.aggregateId);
-                    assert.equal(Object.values(storeMock.tables.snapshots.records).length, 0);
-                    await endSession({
-                        ...status,
+                    const {postHydrationPromise} = await snapshotter.hydrateStatus(exampleStatus, async s => ({
+                        ...s,
                         aggregateVersion: 100
-                    });
+                    }));
+                    await postHydrationPromise;
+
                     assert.deepStrictEqual(storeMock.tables.snapshots.records, {
                         [internalStoreKey]: {
                             ...snapshot,
@@ -199,11 +202,12 @@ describe('Snapshotter', async () => {
                     });
                 }
                 {
-                    const {endSession} = await snapshotter.beginSession(snapshot.aggregateId);
-                    await endSession({
-                        ...status,
+                    const {postHydrationPromise} = await snapshotter.hydrateStatus(exampleStatus, async s => ({
+                        ...s,
                         aggregateVersion: 200
-                    });
+                    }));
+                    await postHydrationPromise;
+
                     assert.deepStrictEqual(storeMock.tables.snapshots.records, {
                         [internalStoreKey]: {
                             ...snapshot,
@@ -217,15 +221,21 @@ describe('Snapshotter', async () => {
             await it('adds a new snapshot if duration condition was met', async () => {
                 snapshotter.configure({duration: 20, eventCount: false});
                 {
-                    const {endSession} = await snapshotter.beginSession(snapshot.aggregateId);
-                    assert.equal(Object.values(storeMock.tables.snapshots.records).length, 0);
-                    await endSession(status);
+                    const {postHydrationPromise} = await snapshotter.hydrateStatus(exampleStatus, async s => s);
+                    await postHydrationPromise;
+
                     assert.equal(Object.values(storeMock.tables.snapshots.records).length, 0);
                 }
                 {
-                    const {endSession} = await snapshotter.beginSession(snapshot.aggregateId);
-                    await new Promise(r => setTimeout(r, 25));
-                    await endSession(status);
+                    const {postHydrationPromise} = await snapshotter.hydrateStatus(exampleStatus, async s => {
+                        await new Promise(r => setTimeout(r, 25));
+                        return {
+                            ...s,
+                            aggregateVersion: snapshot.aggregateVersion
+                        };
+                    });
+                    await postHydrationPromise;
+
                     assert.deepStrictEqual(storeMock.tables.snapshots.records, {
                         [internalStoreKey]: {
                             ...snapshot,
@@ -233,6 +243,37 @@ describe('Snapshotter', async () => {
                         }
                     });
                 }
+            });
+
+            await it('skips existing snapshot if snapshot has an outdated aggregate projector version', async () => {
+                await snapshotter.set(snapshot);
+                snapshotter.configure({eventCount: 100});
+
+                const {postHydrationPromise, ...status} = await snapshotter.hydrateStatus(
+                    {...exampleStatus, projectorVersion: 1},
+                    async s => s
+                );
+                await postHydrationPromise;
+
+                assert.notDeepStrictEqual(status.aggregateVersion, snapshot.aggregateVersion);
+            });
+
+            await it('retries to build state from scratch if existing snapshot is corrupt and not compatible with current aggregate projector anymore', async () => {
+                await snapshotter.set(snapshot);
+                snapshotter.configure({eventCount: 100});
+
+                const {postHydrationPromise, ...status} = await snapshotter.hydrateStatus(
+                    exampleStatus,
+                    async s => {
+                        if(s.aggregateVersion === 1) // snapshot was used
+                            throw new Error('Corrupt Snapshot');
+                        return s;
+                    }
+                );
+                await postHydrationPromise;
+
+                assert.notDeepStrictEqual(status.aggregateVersion, snapshot.aggregateVersion);
+                assert.deepStrictEqual(status.aggregateVersion, exampleStatus.aggregateVersion);
             });
         });
     });

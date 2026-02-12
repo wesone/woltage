@@ -47,10 +47,11 @@ export type AggregateOptions = {
 };
 
 export type AggregateStatus<TState = any> = {
-    state: TState,
-    revision: AppendRevision,
+    aggregateId: string,
     aggregateVersion: number,
     projectorVersion: number
+    state: TState,
+    revision: AppendRevision,
 }
 
 export type CommandContext<TContext extends object = Record<string, never>> = TContext & {
@@ -142,36 +143,11 @@ class Aggregate<TState = any>
         };
     }
 
-    async #initStatus(aggregateId: string) {
-        const initialStatus: AggregateStatus<TState> = {
-            state: (this.projector.$init?.() ?? {}) as TState,
-            revision: STATE_NEW,
-            aggregateVersion: 0,
-            projectorVersion: this.options.projectorVersion ?? 0
-        };
-        const status = {...initialStatus};
-
-        const {snapshot, endSession} = await this.snapshotter.beginSession(aggregateId);
-        const snapshotUsed = snapshot?.projectorVersion === status.projectorVersion;
-        if(snapshotUsed)
-        {
-            status.state = snapshot.state;
-            status.revision = snapshot.revision;
-            status.aggregateVersion = snapshot.aggregateVersion;
-        }
-        return {
-            initialStatus,
-            status,
-            snapshotUsed,
-            endSession
-        };
-    }
-
-    async #catchUpStatus(aggregateId: string, status: AggregateStatus<TState>) {
+    async #statusHydrator(status: AggregateStatus<TState>) {
         const {eventStore} = readStore(executionStorage);
         const events = eventStore.read(
             this.type,
-            aggregateId,
+            status.aggregateId,
             {
                 fromRevision: typeof status.revision === 'bigint'
                     ? status.revision + 1n
@@ -199,30 +175,16 @@ class Aggregate<TState = any>
     }
 
     async #getStatus(aggregateId: string) {
-        const {
-            initialStatus,
-            status,
-            snapshotUsed,
-            endSession
-        } = await this.#initStatus(aggregateId);
-
-        let caughtUpStatus;
-        try
-        {
-            caughtUpStatus = await this.#catchUpStatus(aggregateId, status);
-        }
-        catch(error)
-        {
-            if(!snapshotUsed)
-                throw error;
-
-            caughtUpStatus = await this.#catchUpStatus(aggregateId, initialStatus);
-            console.info(`Corrupt snapshot for ${this.type} aggregate with aggregateId '${aggregateId}' detected. Discarding snapshot and rebuilding state from scratch.`);
-        }
-        return {
-            ...caughtUpStatus,
-            snapshotSession: endSession(caughtUpStatus)
-        };
+        return this.snapshotter.hydrateStatus(
+            {
+                aggregateId,
+                aggregateVersion: 0,
+                projectorVersion: this.options.projectorVersion ?? 0,
+                state: (this.projector.$init?.() ?? {}) as TState,
+                revision: STATE_NEW,
+            },
+            this.#statusHydrator.bind(this)
+        );
     }
 
     async executeCommand(aggregateId: string, commandName: string, payload: any) {
@@ -232,7 +194,7 @@ class Aggregate<TState = any>
         const {schema, command/* , options */} = this.#commands[commandName];
         payload = validate(schema, payload);
 
-        const {state, revision, aggregateVersion, snapshotSession} = await this.#getStatus(aggregateId);
+        const {state, revision, aggregateVersion, postHydrationPromise} = await this.#getStatus(aggregateId);
         const {eventStore, context} = readStore(executionStorage);
         const stateUpdate = await command(
             state,
@@ -243,27 +205,26 @@ class Aggregate<TState = any>
                 aggregateVersion
             })
         );
-        if(!stateUpdate)
+
+        if(stateUpdate)
         {
-            await snapshotSession;
-            return;
+            const {event, force} = !('event' in stateUpdate)
+                ? {force: false, event: stateUpdate}
+                : stateUpdate;
+
+            const events = !Array.isArray(event) ? [event] : event;
+            events.forEach(event => {
+                event.aggregateId = aggregateId;
+            });
+            await eventStore.append(
+                this.type,
+                aggregateId,
+                events,
+                force ? undefined : revision
+            );
         }
 
-        const {event, force} = !('event' in stateUpdate)
-            ? {force: false, event: stateUpdate}
-            : stateUpdate;
-
-        const events = !Array.isArray(event) ? [event] : event;
-        events.forEach(event => {
-            event.aggregateId = aggregateId;
-        });
-        await eventStore.append(
-            this.type,
-            aggregateId,
-            events,
-            force ? undefined : revision
-        );
-        await snapshotSession;
+        await postHydrationPromise;
     }
 }
 
