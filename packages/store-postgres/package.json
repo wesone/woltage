@@ -19,7 +19,7 @@
   },
   "peerDependencies": {
     "pg": "^8.18.0",
-    "woltage": "^1.2.0"
+    "woltage": "^1.x"
   },
   "devDependencies": {
     "@types/pg": "^8.16.0",

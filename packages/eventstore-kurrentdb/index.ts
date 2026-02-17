@@ -30,7 +30,7 @@ import {
     type Position,
     type ReadStreamOptions,
     type ResolvedEvent,
-    type SubscribeToAllOptions,
+    type SubscribeToAllOptions
 } from '@kurrent/kurrentdb-client';
 import {Transform} from 'stream';
 
@@ -40,7 +40,7 @@ type SerializedJSONEvent = JSONEventOptions<{
     data: any;
     metadata: {
         version: number;
-        timestamp: number;
+        timestamp: string;
         aggregateId: string;
         correlationId: string;
         causationId: string | null;
@@ -184,11 +184,11 @@ export default class KurrentDBEventStore implements IEventStore
 
     subscribe(options?: SubscribeOptions) {
         const opts: SubscribeToAllOptions = {};
-        if(options?.fromRevision)
+        if(options?.fromPosition)
         {
-            opts.fromPosition = typeof options.fromRevision === 'string'
-                ? CONSTANTS[options.fromRevision]
-                : {commit: options.fromRevision, prepare: options.fromRevision};
+            opts.fromPosition = typeof options.fromPosition === 'string'
+                ? CONSTANTS[options.fromPosition]
+                : {commit: options.fromPosition, prepare: options.fromPosition};
         }
         if(options?.filter?.types)
             opts.filter = eventTypeFilter({prefixes: options.filter.types});

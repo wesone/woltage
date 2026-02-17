@@ -100,7 +100,7 @@ export default class RedisStore<Definitions extends TableDefinitionMap> implemen
 
     constructor(clientOptions: RedisClientOptions) {
         this.#client = createClient(clientOptions)
-            .on('error', (err: any) => console.log('Redis Client Error', err));
+            .on('error', (err: any) => console.error('Redis Client Error', err));
     }
 
     async connect() {

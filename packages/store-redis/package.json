@@ -19,7 +19,7 @@
   },
   "peerDependencies": {
     "redis": "^5.10.0",
-    "woltage": "^1.2.0"
+    "woltage": "^1.x"
   },
   "devDependencies": {
     "typescript": "^5.9.3"

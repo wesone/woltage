@@ -21,7 +21,7 @@
     "@kurrent/kurrentdb-client": "^1.1.0"
   },
   "peerDependencies": {
-    "woltage": "^1.2.0"
+    "woltage": "^1.x"
   },
   "devDependencies": {
     "typescript": "^5.9.3"

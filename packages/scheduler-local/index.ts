@@ -38,7 +38,7 @@ export type LocalSchedulerConfig = {
     retryFailedInvocations?: boolean | number
 }
 
-export const MAX_TIMEOUT = 2147483647; // https://developer.mozilla.org/en-US/docs/Web/API/Window/setTimeout#maximum_delay_value -> last save value is 2**31-1
+export const MAX_TIMEOUT = 2147483647; // https://developer.mozilla.org/en-US/docs/Web/API/Window/setTimeout#maximum_delay_value -> last safe value is 2**31-1
 
 export default class LocalScheduler implements IScheduler {
     config: LocalSchedulerConfig;
@@ -48,8 +48,8 @@ export default class LocalScheduler implements IScheduler {
     #nextInvocationAt: number = 0;
     #timeout: NodeJS.Timeout | null = null;
 
-    constructor(config?: LocalSchedulerConfig) {
-        this.config = config ?? {};
+    constructor(config: LocalSchedulerConfig = {}) {
+        this.config = config;
     }
 
     async #init() {
