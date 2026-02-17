@@ -16,6 +16,7 @@ export default class ProjectionMap
         const projection = this.idMap.get(projectionId)!;
         if(!projection.isLiveTracking && !force)
             throw new Error(`Projection '${projection.getDisplayName()}' is not tracking live events.`);
+
         this.activeProjectionMap.set(projectionName, projection);
     }
 
@@ -38,13 +39,15 @@ export default class ProjectionMap
             return;
 
         const isActive = this.getActive(projectionName) === projection;
-        if(!force && isActive)
-            throw new Error(`Can't remove active projection '${projection.getDisplayName()}'.`);
+        if(isActive)
+        {
+            if(!force)
+                throw new Error(`Can't remove active projection '${projection.getDisplayName()}'.`);
+            this.activeProjectionMap.delete(projectionName);
+        }
 
         await projection.stop();
         this.idMap.delete(projection.id);
-        if(isActive)
-            this.activeProjectionMap.delete(projectionName);
     }
 
     async init() {

@@ -37,6 +37,8 @@ export type Direction = typeof FORWARDS | typeof BACKWARDS;
 
 export type ReadOptions = {
     /**
+     * If the revision is of type BigInt, the revision corresponds to the event index inside the stream.
+     *
      * Default: `"start"`
      */
     fromRevision?: ReadRevision,
@@ -54,7 +56,7 @@ export type SubscribeOptions = {
     /**
      * Default: `"start"`
      */
-    fromRevision?: ReadRevision,
+    fromPosition?: ReadRevision,
     filter?: Filter
 };
 

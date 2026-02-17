@@ -6,12 +6,12 @@ export default class EventCaster
 {
     static CASTING_DIRECTIONS = Object.freeze({
         UP: 'up',
-        DOWN: 'down',
+        DOWN: 'down'
     });
 
     static CASTING_ERRORS = Object.freeze({
         KEY_MISSING: 'Key missing',
-        TYPE_CHANGED: 'Type changed',
+        TYPE_CHANGED: 'Type changed'
     });
 
     static async cast(event: Event, targetVersion: number) {

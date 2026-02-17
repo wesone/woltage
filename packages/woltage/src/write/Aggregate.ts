@@ -7,7 +7,7 @@ import {
     type AppendRevision
 } from '../adapters/EventStore.ts';
 import EventRegistry from '../EventRegistry.ts';
-import {readStore, executionStorage} from '../localStorages.ts';
+import {readContext, executionStorage} from '../localStorages.ts';
 import validate from '../utils/validate.ts';
 import type {SnapshotConfig} from './Snapshotter.ts';
 import Snapshotter from './Snapshotter.ts';
@@ -98,12 +98,12 @@ class Aggregate<TState = any>
         return new this<TState>(type, projector, options);
     }
 
-    #type: string;
-    projector: AggregateProjector<TState>;
-    options: AggregateOptions;
-    #registry: EventRegistry;
+    #type;
+    projector;
+    options;
+    #registry;
     #commands: {[commandName: string]: {schema: z.ZodType, command: Command<TState>, options: CommandOptions}} = {};
-    snapshotter: Snapshotter;
+    snapshotter;
 
     private constructor(type: string, projector: AggregateProjector<TState>, options: AggregateOptions = {}) {
         this.#type = type;
@@ -144,7 +144,7 @@ class Aggregate<TState = any>
     }
 
     async #statusHydrator(status: AggregateStatus<TState>) {
-        const {eventStore} = readStore(executionStorage);
+        const {eventStore} = readContext(executionStorage);
         const events = eventStore.read(
             this.type,
             status.aggregateId,
@@ -158,7 +158,7 @@ class Aggregate<TState = any>
         {
             for await (const event of events)
             {
-                status.revision = event.position;
+                status.revision = BigInt(status.aggregateVersion);
                 status.aggregateVersion++;
                 const {event: transformedEvent, handler = this.projector.$all} = await this.#registry.get(event);
                 status.state = handler?.(status.state, transformedEvent) ?? status.state;
@@ -181,7 +181,7 @@ class Aggregate<TState = any>
                 aggregateVersion: 0,
                 projectorVersion: this.options.projectorVersion ?? 0,
                 state: (this.projector.$init?.() ?? {}) as TState,
-                revision: STATE_NEW,
+                revision: STATE_NEW
             },
             this.#statusHydrator.bind(this)
         );
@@ -195,7 +195,7 @@ class Aggregate<TState = any>
         payload = validate(schema, payload);
 
         const {state, revision, aggregateVersion, postHydrationPromise} = await this.#getStatus(aggregateId);
-        const {eventStore, context} = readStore(executionStorage);
+        const {eventStore, context} = readContext(executionStorage);
         const stateUpdate = await command(
             state,
             payload,

@@ -1,32 +1,34 @@
 import {AsyncLocalStorage} from 'node:async_hooks';
 import type Event from './Event.ts';
 import type {IEventStore} from './adapters/EventStore.ts';
+import type Projection from './read/Projection.ts';
 import type ReadModel from './read/ReadModel.ts';
 import type ProjectionMap from './ProjectionMap.ts';
 import type {Context, Woltage} from './Woltage.ts';
 
-export function readStore<T>(asyncLocalStorage: AsyncLocalStorage<T>)
+export function readContext<T>(contextStorage: AsyncLocalStorage<T>)
 {
-    const store = asyncLocalStorage.getStore();
+    const store = contextStorage.getStore();
     if(store === undefined)
-        throw new Error('AsyncLocalStorage not available. Make sure to run this code within an AsyncLocalStorage context.');
+        throw new Error('Context not available. Make sure to run this code within a context.');
     return store;
 }
 
-export type ProjectionStore = {
+export type ProjectionContext = {
     isReplaying: boolean,
     currentEvent: Event,
+    woltage: Woltage,
     eventStore: IEventStore,
-    scheduleCommand: Woltage['scheduleCommand'],
+    projection?: Projection
 };
 
-export const projectionStorage = new AsyncLocalStorage<ProjectionStore>();
+export const projectionStorage = new AsyncLocalStorage<ProjectionContext>();
 
-export type ExecutionStore = {
+export type ExecutionContext = {
     eventStore: IEventStore,
     readModelMap: Record<string, ReadModel>,
     projectionMap: ProjectionMap['activeProjectionMap'],
     context?: Context
 };
 
-export const executionStorage = new AsyncLocalStorage<ExecutionStore>();
+export const executionStorage = new AsyncLocalStorage<ExecutionContext>();

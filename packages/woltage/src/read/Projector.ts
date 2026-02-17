@@ -1,10 +1,11 @@
 import type Event from '../Event.ts';
 import EventRegistry from '../EventRegistry.ts';
 import emit from '../sideEffects/emit.ts';
+import executeCommand from '../sideEffects/executeCommand.ts';
 import scheduleCommand from '../sideEffects/scheduleCommand.ts';
 import type {IStore, TableDefinitionMap} from '../adapters/Store.ts';
 
-class Projector<Definitions extends TableDefinitionMap>
+class Projector<Definitions extends TableDefinitionMap = any>
 {
     declare ['constructor']: typeof Projector;
 
@@ -15,9 +16,10 @@ class Projector<Definitions extends TableDefinitionMap>
         return `${name}@${version}`;
     }
 
-    #registry: EventRegistry;
+    #registry;
     readonly store: IStore<Definitions>;
     readonly emit = emit;
+    readonly executeCommand = executeCommand;
     readonly scheduleCommand = scheduleCommand;
 
     constructor(store: IStore) {

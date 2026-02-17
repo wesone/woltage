@@ -18,9 +18,13 @@ export {default as Aggregate} from './src/write/Aggregate.ts';
 export {default as Projector} from './src/read/Projector.ts';
 export {default as ReadModel} from './src/read/ReadModel.ts';
 
+export type * from './src/sideEffects/sideEffect.ts';
 export {default as sideEffect} from './src/sideEffects/sideEffect.ts';
 export {default as emit} from './src/sideEffects/emit.ts';
+export {default as executeCommand} from './src/sideEffects/executeCommand.ts';
 export {default as scheduleCommand} from './src/sideEffects/scheduleCommand.ts';
+
+export {default as getProjectionContext} from './src/read/getProjectionContext.ts';
 
 export {default as validate} from './src/utils/validate.ts';
 

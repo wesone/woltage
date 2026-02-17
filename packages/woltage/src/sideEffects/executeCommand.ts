@@ -3,6 +3,6 @@ import type {Woltage} from '../Woltage.ts';
 import {readContext, projectionStorage} from '../localStorages.ts';
 
 export default sideEffect(
-    (...args: Parameters<Woltage['scheduleCommand']>) =>
-        readContext(projectionStorage).woltage.scheduleCommand(...args)
-) as Woltage['scheduleCommand'];
+    (...args: Parameters<Woltage['executeCommand']>) =>
+        readContext(projectionStorage).woltage.executeCommand(...args)
+) as Woltage['executeCommand'];

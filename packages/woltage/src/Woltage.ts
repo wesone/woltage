@@ -3,6 +3,7 @@ import Aggregate, {type CommandInfo} from './write/Aggregate.ts';
 import Event from './Event.ts';
 import {registerEventClasses} from './eventMap.ts';
 import Projector from './read/Projector.ts';
+import type {IEventStore} from './adapters/EventStore.ts';
 import type {IStore} from './adapters/Store.ts';
 import z from 'zod';
 import {constructAdapter, createStore, createStoreFactory} from './utils/adapterUtils.ts';
@@ -11,9 +12,9 @@ import ConflictError from './errors/ConflictError.ts';
 import ProjectionMap from './ProjectionMap.ts';
 import ReadModel from './read/ReadModel.ts';
 import NotFoundError from './errors/NotFoundError.ts';
-import {executionStorage} from './localStorages.ts';
+import {executionStorage, projectionStorage} from './localStorages.ts';
 import type {WoltageConfig} from './WoltageConfig.ts';
-import type {IScheduler} from './adapters/Scheduler.ts';
+import CommandScheduler from './write/CommandScheduler.ts';
 
 export type AggregateMap = {[aggregateType: string]: Aggregate};
 
@@ -25,7 +26,7 @@ export type ProjectorMap = {
 
 export type Context = Record<string, unknown>;
 
-const projectionConfigSchema = {
+const internalConfigSchema = {
     projections: {
         key: z.object({
             id: z.string()
@@ -43,7 +44,7 @@ const projectionConfigSchema = {
                             version: z.int(),
                             projectorName: z.string(),
                             projectorVersion: z.int(),
-                            storeName: z.string(),
+                            storeName: z.string()
                         })
                     )
                 })
@@ -81,15 +82,15 @@ class Woltage
         return instance;
     }
 
-    config: WoltageConfig;
+    config;
     #aggregateMap: AggregateMap = {};
     #projectorMap: ProjectorMap = {};
     #readModelMap: Record<string, ReadModel> = {};
-    #eventStore;
-    #store: IStore<typeof projectionConfigSchema>;
-    #getStore: ReturnType<typeof createStoreFactory>;
-    #projections: ProjectionMap;
-    #scheduler: IScheduler | undefined;
+    #eventStore: IEventStore;
+    #store: IStore<typeof internalConfigSchema>;
+    #getStore;
+    #projections;
+    #commandScheduler?: CommandScheduler;
 
     constructor(config: WoltageConfig) {
         this.config = config;
@@ -97,14 +98,23 @@ class Woltage
         this.#eventStore = constructAdapter(this.config.eventStore);
 
         this.#store = createStore(this.config.internalStore, '_woltage_config');
-        this.#store.defineTables(projectionConfigSchema);
+        this.#store.defineTables(internalConfigSchema);
 
         this.#getStore = createStoreFactory(this.config.stores ?? {});
 
         this.#projections = new ProjectionMap();
 
         if(this.config.scheduler)
-            this.#scheduler = constructAdapter(this.config.scheduler);
+        {
+            const executeCommand = this.executeCommand.bind(this);
+            this.#commandScheduler = new CommandScheduler(
+                this.config.scheduler,
+                async (executeAt, data) => {
+                    await executeCommand(...(data as Parameters<Woltage['executeCommand']>))
+                        .catch(console.info);
+                }
+            );
+        }
     }
 
     async #loadModules<TModule>(pathOrModules: string | TModule[] | undefined, filter: (module: any) => boolean): Promise<TModule[]> {
@@ -155,11 +165,6 @@ class Woltage
 
         await this.#store.connect()
             .then(() => this.#loadProjections());
-
-        await this.#scheduler?.subscribe(async (executeAt, data) => {
-            await this.executeCommand(...(data as Parameters<Woltage['executeCommand']>))
-                .catch(console.info);
-        });
     }
 
     async #loadProjections() {
@@ -181,7 +186,7 @@ class Woltage
     }
 
     async #saveProjections() {
-        const map: z.infer<typeof projectionConfigSchema['projections']['schema']['shape']['map']> = {};
+        const map: z.infer<typeof internalConfigSchema['projections']['schema']['shape']['map']> = {};
         for(const projection of this.#projections.idMap.values())
         {
             map[projection.name] ??= {activeVersion: undefined, versions: {}};
@@ -224,25 +229,55 @@ class Woltage
         return projection;
     }
 
+    /**
+     * Adds a new projection.
+     * @param projectionName
+     * @param projectionVersion
+     * @param projectorName
+     * @param projectorVersion
+     * @param storeName One of the keys of the config's `stores` property.
+     */
     async addProjection(projectionName: string, projectionVersion: number, projectorName: string, projectorVersion: number, storeName: string) {
         const projection = await this.#createProjection(projectionName, projectionVersion, projectorName, projectorVersion, storeName);
         this.#projections.add(projection);
         await this.#saveProjections();
+        return projection;
     }
 
+    /**
+     * Updates the active version of a projection name.
+     * @param projectionName
+     * @param projectionVersion
+     * @param force You can not switch to a projection that is not tracking live events unless you set the optional `force` parameter to `true`.
+     */
     async setProjectionActive(projectionName: string, projectionVersion: number, force = false) {
         this.#projections.setActive(projectionName, projectionVersion, force);
         await this.#saveProjections();
     }
 
+    /**
+     * Returns all registered projections.
+     */
     getProjections() {
         return Object.fromEntries(this.#projections.idMap);
     }
 
+    /**
+     * Returns a specific projection or `undefined` if the projection does not exist.
+     * @param projectionName
+     * @param projectionVersion
+     */
     getProjection(projectionName: string, projectionVersion: number) {
         return this.#projections.get(projectionName, projectionVersion);
     }
 
+    /**
+     * Removes a projection.
+     * Removing a projection will not delete its data from the corresponding store.
+     * @param projectionName
+     * @param projectionVersion
+     * @param force You can not remove a projection that is currently active unless you set the optional `force` parameter to `true`
+     */
     async removeProjection(projectionName: string, projectionVersion: number, force = false) {
         await this.#projections.remove(projectionName, projectionVersion, force);
         await this.#saveProjections();
@@ -260,6 +295,10 @@ class Woltage
         );
     }
 
+    /**
+     * Executes a command.
+     * The optional `context` will be passed to the command.
+     */
     async executeCommand<TState, TPayload extends z.ZodType = any>(commandInfo: CommandInfo<TState, TPayload>, aggregateId: string, payload: any, context?: Context): Promise<void>
     async executeCommand(aggregate: Aggregate, aggregateId: string, commandName: string, payload: any, context?: Context): Promise<void>
     async executeCommand(aggregateType: string, aggregateId: string, commandName: string, payload: any, context?: Context): Promise<void>
@@ -277,22 +316,52 @@ class Woltage
             else // Aggregate
                 aggregateType = aggregateType.type;
         }
+
         const aggregate = this.#aggregateMap[aggregateType];
         if(!aggregate)
             throw new NotFoundError(`Aggregate '${aggregateType}' not found.`);
         await this.#execute(() => aggregate.executeCommand(aggregateId, commandName, payload), context);
     }
 
+    /**
+     * Schedules a command for execution at a specific time.
+     * The optional `context` will be passed to the command.
+     *
+     * For this to work a `scheduler` must be provided via config.
+     */
     async scheduleCommand<TState, TPayload extends z.ZodType = any>(executeAt: Date, commandInfo: CommandInfo<TState, TPayload>, aggregateId: string, payload: any, context?: Context): Promise<void>
     async scheduleCommand(executeAt: Date, aggregate: Aggregate, aggregateId: string, commandName: string, payload: any, context?: Context): Promise<void>
     async scheduleCommand(executeAt: Date, aggregateType: string, aggregateId: string, commandName: string, payload: any, context?: Context): Promise<void>
-    async scheduleCommand(executeAt: Date, ...args: any[]) {
-        if(!this.#scheduler)
+    async scheduleCommand(executeAt: Date, aggregateType: string | Aggregate | CommandInfo<any>, aggregateId: string, commandName: string, payload: any, context?: any) {
+        if(!this.#commandScheduler)
             throw new Error('No scheduler provided. Define a scheduler in the config to use \'scheduleCommand\'.');
-        //TODO handle non primitive params
-        this.#scheduler.schedule(executeAt, args);
+
+        if(typeof aggregateType !== 'string')
+        {
+            if('aggregate' in aggregateType) // CommandInfo
+            {
+                const commandInfo = aggregateType;
+                context = payload;
+                payload = commandName;
+                commandName = commandInfo.name;
+                aggregateType = commandInfo.aggregate.type;
+            }
+            else // Aggregate
+                aggregateType = aggregateType.type;
+        }
+        await this.#commandScheduler.schedule(executeAt, [
+            aggregateType,
+            aggregateId,
+            commandName,
+            payload,
+            context
+        ]);
     }
 
+    /**
+     * Returns the result of the corresponding read model handler.
+     * The optional `context` will be passed to the handler.
+     */
     async executeQuery<
         TClass extends typeof ReadModel,
         THandler extends keyof InstanceType<TClass>
@@ -312,12 +381,35 @@ class Woltage
         return await this.#execute(() => readModel.call(handlerName, query), context);
     }
 
+    /**
+     * Runs a function within a projection context and returns the function's return value.
+     * @param triggerEvent The event that acts as the trigger for the side effect.
+     * @param callback The function to execute.
+     * @param args Optional arguments to pass to the function.
+     */
+    executeAsSideEffect<R, TArgs extends any[]>(triggerEvent: Event, callback: (...args: TArgs) => R, ...args: TArgs): R {
+        return projectionStorage.run({
+            isReplaying: false,
+            currentEvent: triggerEvent,
+            woltage: this,
+            eventStore: this.#eventStore
+        }, callback, ...args);
+    }
+
+    /**
+     * Starts the application.
+     */
     async start() {
         await this.#eventStore.connect();
         await this.#projections.init();
+        await this.#commandScheduler?.start();
     }
 
+    /**
+     * Gracefully stops the application.
+     */
     async stop() {
+        await this.#commandScheduler?.stop();
         await this.#projections.stop();
         await this.#eventStore.close();
     }

@@ -1,15 +1,17 @@
 import {projectionStorage} from '../localStorages.ts';
 
-type SideEffectFn<TArgs extends any[]> = (...args: TArgs) => void | Promise<void>;
+export type SideEffectFunction<TArgs extends any[]> = (...args: TArgs) => void | Promise<void>;
 
-export default function sideEffect<TArgs extends any[]>(fn: SideEffectFn<TArgs>): SideEffectFn<TArgs>
+export default function sideEffect<TArgs extends any[]>(fn: SideEffectFunction<TArgs>): SideEffectFunction<TArgs>
 {
     return async (...args) => {
         const store = projectionStorage.getStore();
         if(store === undefined)
-            console.trace(`Invalid side effect execution "${fn.toString()}".`, 'Executing side effects is only possible from event handlers in projections.');
-        else if(store.isReplaying === false)
-            //TODO allow custom sideEffect executor to handle retries and failure
+            console.trace(`Invalid side effect execution "${fn.toString()}".`, 'Executing side effects is only possible within a projection context.');
+        else if(
+            store.isReplaying === false
+            && (!store.projection || store.projection.isActive)
+        )
             await fn(...args);
         return Promise.resolve();
     };

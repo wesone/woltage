@@ -10,7 +10,7 @@ type HandlerMap = {
 
 export default class EventRegistry
 {
-    #handlerMap: HandlerMap;
+    #handlerMap;
 
     /**
      *

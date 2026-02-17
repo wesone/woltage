@@ -55,7 +55,7 @@ abstract class ReadModel<TProjector extends Projector<any> = any>
             if(handler.name in this.schemaRegistry)
                 query = this.validate(this.schemaRegistry[handler.name]!, query);
             const context = Object.freeze({
-                ...(executionStorage.getStore()?.context ?? {}),
+                ...(executionStorage.getStore()?.context ?? {})
             });
             return handler.bind(this)(query, context);
         }

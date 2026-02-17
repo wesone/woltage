@@ -3,25 +3,26 @@ import z from 'zod';
 import {projectionStorage} from './localStorages.ts';
 import {getEventClass} from './eventMap.ts';
 
-type NewEventData<TPayload extends z.ZodType, TMeta = any> = {
+export type EventInitData<TPayload extends z.ZodType = any, TMeta = any> = {
     aggregateId?: string,
     payload: z.infer<TPayload>,
     meta?: TMeta
 };
 
-type EventData<TPayload extends z.ZodType, TMeta = any> = NewEventData<TPayload> & {
+export type EventData<TPayload extends z.ZodType = any, TMeta = any> = {
     id: string,
     type: string,
     version: number,
-    timestamp: number,
-    aggregateId: string
+    timestamp: string,
+    aggregateId: string,
+    payload: z.infer<TPayload>,
     correlationId: string,
     causationId: string | null,
     meta: TMeta,
     position: bigint
 };
 
-export type EventConstructionData<TPayload extends z.ZodType, TMeta = any> = EventData<TPayload, TMeta> | NewEventData<TPayload, TMeta>;
+export type EventConstructionData<TPayload extends z.ZodType, TMeta = any> = EventData<TPayload, TMeta> | EventInitData<TPayload, TMeta>;
 
 export type EventIdentityData<T extends typeof Event = any> = {
     type: T['type'],
@@ -30,7 +31,7 @@ export type EventIdentityData<T extends typeof Event = any> = {
 
 export type EventIdentity<T extends typeof Event = any> = `{"type":"${T['type']}","version":${T['version']}}`;
 
-export default class Event<TPayload extends z.ZodType = any, TMeta = any> implements EventData<TPayload, TMeta>
+export default class Event<TPayload extends z.ZodType = any, TMeta = any>
 {
     /**
      * @see https://github.com/Microsoft/TypeScript/issues/3841#issuecomment-337560146
@@ -63,22 +64,25 @@ export default class Event<TPayload extends z.ZodType = any, TMeta = any> implem
         return this.schema.parse(payload);
     }
 
-    static fromJSON(data: EventData<any>, shouldValidate: boolean = false) {
-        return new (getEventClass(data.type, data.version))(data, shouldValidate);
+    static fromJSON(data: EventData | Event, shouldValidate: boolean = false) {
+        return new (getEventClass(data.type, data.version))(
+            'toJSON' in data ? data.toJSON() : data,
+            shouldValidate
+        );
     }
 
     static getDisplayName(type = this.type, version = this.version) {
         return `${type}@${version}`;
     }
 
-    id: string;
-    timestamp: number;
-    aggregateId: string;
+    id;
+    timestamp;
+    aggregateId;
     payload: z.infer<TPayload>;
     correlationId: string;
     causationId: string | null;
     meta: TMeta;
-    position: bigint;
+    position;
 
     constructor(data: EventConstructionData<TPayload, TMeta>, shouldValidate: boolean = true) {
         if(typeof this.version !== 'number' || this.version <= 0)
@@ -102,7 +106,7 @@ export default class Event<TPayload extends z.ZodType = any, TMeta = any> implem
         } = data as EventData<TPayload>;
 
         this.id = id;
-        this.timestamp = timestamp;
+        this.timestamp = new Date(timestamp);
         this.aggregateId = aggregateId;
         this.payload = payload;
         const currentEvent = projectionStorage.getStore()?.currentEvent;
@@ -139,7 +143,7 @@ export default class Event<TPayload extends z.ZodType = any, TMeta = any> implem
             id: this.id,
             type: this.type,
             version: this.version,
-            timestamp: this.timestamp,
+            timestamp: this.timestamp.toISOString(),
             aggregateId: this.aggregateId,
             payload: structuredClone(this.payload),
             correlationId: this.correlationId,

@@ -69,6 +69,4 @@ export type WoltageConfig = {
      * Without a scheduler adapter, the scheduling feature is disabled.
      */
     scheduler?: SchedulerAdapterConfig
-
-    //TODO add options for custom side effect executor
 }

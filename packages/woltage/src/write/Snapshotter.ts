@@ -32,7 +32,7 @@ export const snapshotSchema = {
             aggregateVersion: z.int(),
             projectorVersion: z.number(),
             revision: z.union([z.bigint(), z.literal([STATE_NEW, STATE_EXISTS])]),
-            timestamp: z.int(),
+            timestamp: z.date(),
             state: z.any()
         })
     }
@@ -40,7 +40,7 @@ export const snapshotSchema = {
 
 class Snapshotter
 {
-    #aggregateType: string;
+    #aggregateType;
     config?: SnapshotConfig | false;
     #store?: IStore<typeof snapshotSchema>;
 
@@ -130,7 +130,7 @@ class Snapshotter
             ? this.set({
                 ...hydratedStatus,
                 aggregateType: this.#aggregateType,
-                timestamp: Date.now(),
+                timestamp: new Date()
             })
             : Promise.resolve();
 
