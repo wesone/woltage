@@ -29,17 +29,18 @@ class Projection
         return `${name}@${version}`;
     }
 
-    readonly #woltage: Woltage;
-    readonly #eventStore: IEventStore;
-    readonly id: string;
-    readonly name: string;
-    readonly version: number;
+    readonly #woltage;
+    readonly #eventStore;
+    readonly id;
+    readonly name;
+    readonly version;
     storeName?: string;
-    projector: Projector<typeof configDefinition>;
-    #isReplaying: boolean = true;
-    #isLiveTracking: boolean = false;
-    #latestPosition: bigint = -1n;
+    projector;
+    #isReplaying = true;
+    #isLiveTracking = false;
+    #latestPosition = -1n;
     #subscription?: SubscriptionStream;
+    isActive = false;
 
     constructor(
         woltage: Woltage,
@@ -56,7 +57,7 @@ class Projection
         this.version = version;
 
         store.defineTables(configDefinition);
-        this.projector = new ProjectorClass(store);
+        this.projector = new ProjectorClass<typeof configDefinition>(store);
     }
 
     get isReplaying() {
@@ -77,7 +78,7 @@ class Projection
             this.#onReplayed();
 
         this.#subscription = this.#eventStore.subscribe({
-            fromRevision: startPosition ?? START,
+            fromPosition: startPosition ?? START,
             filter
         });
         this.#subscription.on('data', async event => {
@@ -108,8 +109,9 @@ class Projection
             {
                 isReplaying: this.isReplaying,
                 currentEvent: event,
+                woltage: this.#woltage,
                 eventStore: this.#eventStore,
-                scheduleCommand: this.#woltage.scheduleCommand
+                projection: this
             },
             () => this.projector.onEvent(event)
         );
@@ -133,6 +135,7 @@ class Projection
             storeName: this.storeName,
             isReplaying: this.#isReplaying,
             isLiveTracking: this.#isLiveTracking,
+            isActive: this.isActive,
             latestPosition: this.#latestPosition.toString() + 'n',
             projector:  {
                 name: this.projector.constructor.name,

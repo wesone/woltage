@@ -4,9 +4,12 @@ export default class ProjectionMap
 {
     idMap: Map<string, Projection> = new Map();
     activeProjectionMap: Map<string, Projection> = new Map();
+    isRunning = false;
 
-    add(projection: Projection) {
+    async add(projection: Projection) {
         this.idMap.set(projection.id, projection);
+        if(this.isRunning)
+            await projection.init();
     }
 
     setActive(projectionName: string, projectionVersion: number, force = false) {
@@ -17,6 +20,10 @@ export default class ProjectionMap
         if(!projection.isLiveTracking && !force)
             throw new Error(`Projection '${projection.getDisplayName()}' is not tracking live events.`);
 
+        const activeProjection = this.activeProjectionMap.get(projectionName);
+        if(activeProjection)
+            activeProjection.isActive = false;
+        projection.isActive = true;
         this.activeProjectionMap.set(projectionName, projection);
     }
 
@@ -51,10 +58,12 @@ export default class ProjectionMap
     }
 
     async init() {
+        this.isRunning = true;
         await Promise.all([...this.idMap.values()].map(projection => projection.init()));
     }
 
     async stop() {
+        this.isRunning = false;
         await Promise.all([...this.idMap.values()].map(projection => projection.stop()));
     }
 }

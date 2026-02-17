@@ -239,7 +239,7 @@ class Woltage
      */
     async addProjection(projectionName: string, projectionVersion: number, projectorName: string, projectorVersion: number, storeName: string) {
         const projection = await this.#createProjection(projectionName, projectionVersion, projectorName, projectorVersion, storeName);
-        this.#projections.add(projection);
+        await this.#projections.add(projection);
         await this.#saveProjections();
         return projection;
     }
