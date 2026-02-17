@@ -272,7 +272,7 @@ const addressSchema = z.object({
 const orderAggregate = Aggregate.create('order', {
     $init() {
         return {
-            placedAt: 0
+            placedAt: null as Date | null,
             items: [] as z.infer<typeof itemSchema>[],
             shippingAddress: {/* ... */},
             billingAddress: {/* ... */},
@@ -451,7 +451,7 @@ const schema = {
         }),
         schema: z.object({
             userId: z.uuid(),
-            registeredAt: z.number()
+            registeredAt: z.date()
         })
     }
 };
@@ -491,7 +491,7 @@ const schema = {
         }),
         schema: z.object({
             userId: z.uuid(),
-            registeredAt: z.number()
+            registeredAt: z.date()
         })
     }
 };
@@ -528,7 +528,7 @@ To build your business logic, you may need to execute side effects. For example,
 
 - The problem: when calling the function for sending an email is part of the event handler logic, it will execute also during a replay. Maybe someday you need to change the projection logic and suddenly all of your users will receive confirmation emails even though their accounts are years old.
 
-- The solution: wrap your functions with `sideEffect()` and call that instead. It has the same signature than before, but the side effect will not execute your function during a replay.
+- The solution: wrap your functions with `sideEffect()` and call that instead. It has the same signature than before, but the side effect will not execute your function during a replay or if called from a projection that is not active.
 
 ```typescript
 import {Projector, z, sideEffect} from 'woltage';
@@ -548,7 +548,7 @@ const schema = {
         }),
         schema: z.object({
             userId: z.uuid(),
-            registeredAt: z.number()
+            registeredAt: z.date()
         })
     }
 };
@@ -695,6 +695,12 @@ To execute a [command](#command) of an aggregate at a specific time in the futur
 `async executeQuery(readModel: typeof ReadModel, handlerName: string, query: any, context?: any): Promise<any>`
 
 To execute a [read model handler](#handler). If the optional `context` parameter was provided, it will be added to the context parameter of the read model handler.
+
+### executeAsSideEffect
+
+`executeAsSideEffect<R, TArgs extends any[]>(triggerEvent: Event, callback: (...args: TArgs) => R, ...args: TArgs): R`
+
+Runs a function within a projection context and returns the function's return value.
 
 ### addProjection
 
