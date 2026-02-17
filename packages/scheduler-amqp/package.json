@@ -1,0 +1,31 @@
+{
+  "name": "@woltage/scheduler-amqp",
+  "version": "1.0.0",
+  "description": "AMQP Scheduler adapter for Woltage",
+  "license": "ISC",
+  "author": "wesone",
+  "type": "module",
+  "main": "dist/index.js",
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/wesone/woltage.git"
+  },
+  "homepage": "https://github.com/wesone/woltage",
+  "scripts": {
+    "build": "npx tsc -p tsconfig.json",
+    "test": "node --test --experimental-test-coverage './test/**/*.test.*'",
+    "test-watch": "node --watch --test './test/**/*.test.*'",
+    "prepack": "npm run build"
+  },
+  "peerDependencies": {
+    "amqp-connection-manager": "*",
+    "amqplib": "*"
+  },
+  "devDependencies": {
+    "@types/amqplib": "^0.10.8",
+    "typescript": "^5.9.3"
+  },
+  "files": [
+    "/dist"
+  ]
+}
