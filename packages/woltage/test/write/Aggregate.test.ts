@@ -109,7 +109,7 @@ describe('Aggregate', async () => {
                 state.eventCount++;
                 state.name = event.payload.name;
                 return state;
-            },
+            }
         });
         const command = mock.fn(function doSomething() {});
         aggregate.registerCommand(command);
@@ -146,7 +146,7 @@ describe('Aggregate', async () => {
         const aggregate = Aggregate.create(aggregateType, {
             $init() {
                 return {
-                    eventCount: 0,
+                    eventCount: 0
                 };
             },
             $all(state) {
@@ -300,7 +300,7 @@ describe('Aggregate', async () => {
             const command = () => {};
             aggregate.registerCommand(
                 z.object({
-                    num: z.number(),
+                    num: z.number()
                 }),
                 command
             );
@@ -387,7 +387,7 @@ describe('Aggregate', async () => {
                 state.eventCount++;
                 state.name = event.payload.name;
                 return state;
-            },
+            }
         });
         let resultState = {};
         const command = mock.fn(function doSomething(state) {resultState = state;});
@@ -402,7 +402,7 @@ describe('Aggregate', async () => {
             aggregateType,
             aggregateVersion: 2,
             revision: 2n,
-            timestamp: Date.now(),
+            timestamp: new Date(),
             state: {
                 eventCount: 2,
                 name: 'Jefferson',

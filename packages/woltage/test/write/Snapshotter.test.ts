@@ -12,7 +12,7 @@ describe('Snapshotter', async () => {
         projectorVersion: 0,
         aggregateType: 'test',
         revision: 1n,
-        timestamp: Date.now(),
+        timestamp: new Date(),
         state: {}
     };
 

@@ -2,7 +2,7 @@ import {describe, it} from 'node:test';
 import assert from 'node:assert/strict';
 import Event from '../src/Event.ts';
 import z from 'zod';
-import mockProjectionStorage from './_mock/mockProjectionStorage.ts';
+import mockProjectionContext from './_mock/mockProjectionContext.ts';
 
 describe('Event', async () => {
     const testEventType = 'test.event';
@@ -37,6 +37,31 @@ describe('Event', async () => {
 
         assert.strictEqual(TestEvent.identity, identity);
         assert.strictEqual(new TestEvent({payload: null}).identity, identity);
+    });
+
+    await it('fromJSON - constructs event from event data', async () => {
+        assert.strictEqual(
+            Event.fromJSON({
+                id: 'eventId1',
+                type: 'test.event',
+                version: 42,
+                timestamp: '2023-04-23T08:42:00.000Z',
+                aggregateId: 'aggregateId1',
+                payload: {},
+                correlationId: 'eventId1',
+                causationId: null,
+                meta: {},
+                position: 1n
+            }, false).identity,
+            '{"type":"test.event","version":42}'
+        );
+    });
+
+    await it('fromJSON - constructs event from event instance', async () => {
+        assert.strictEqual(
+            Event.fromJSON(new TestEvent({aggregateId: 'aggregateId', payload: null}), false).identity,
+            '{"type":"test.event","version":42}'
+        );
     });
 
     await it('toJSON - fails if no aggregateId was set', async () => {
@@ -114,9 +139,9 @@ describe('Event', async () => {
             });
         });
 
-        await it('enriches event with correlation and causation id automatically if available', async () => {
+        await it('enriches event with correlation and causation ID automatically if available', async () => {
             const currentEvent = new TestEvent({correlationId: '42', causationId: '21', payload: null});
-            mockProjectionStorage({currentEvent});
+            mockProjectionContext({currentEvent});
 
             assert.strictEqual(new TestEvent({correlationId: 'a', payload: null}).correlationId, 'a');
             assert.strictEqual(new TestEvent({causationId: 'b', payload: null}).causationId, 'b');

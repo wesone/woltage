@@ -57,18 +57,7 @@ class EventStore implements MockedEventStore
                 while(events.length)
                 {
                     const event = events.shift() as Event;
-                    yield Event.fromJSON({
-                        id: event.id,
-                        type: event.type,
-                        version: event.version,
-                        timestamp: event.timestamp,
-                        aggregateId: event.aggregateId,
-                        payload: event.payload,
-                        correlationId: event.correlationId,
-                        causationId: event.causationId,
-                        meta: event.meta,
-                        position: event.position
-                    }, false);
+                    yield Event.fromJSON(event.toJSON(), false);
                 }
             })()
         );
@@ -80,7 +69,7 @@ class EventStore implements MockedEventStore
                 if(
                     revision === STATE_NEW && currentEvents.length
                     || revision === STATE_EXISTS && !currentEvents.length
-                    || (typeof revision === 'bigint' && revision < BigInt(currentEvents.length))
+                    || (typeof revision === 'bigint' && revision !== BigInt(currentEvents.length - 1))
                 )
                     return Promise.reject(new ConflictError());
 

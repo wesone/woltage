@@ -7,7 +7,7 @@ import BadRequestError from '../../src/errors/BadRequestError.ts';
 
 describe('validate', async () => {
     const schema = z.object({
-        num: z.number(),
+        num: z.number()
     });
 
     await it('validates data against a Zod schema', async () => {
