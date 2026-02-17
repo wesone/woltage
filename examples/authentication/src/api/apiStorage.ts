@@ -4,4 +4,5 @@ import type {Request} from 'express';
 type APIStorage = {
     user: Request['user']
 };
+
 export default new AsyncLocalStorage<APIStorage>();

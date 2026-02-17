@@ -1,7 +1,7 @@
 
 import jwt from 'jsonwebtoken';
 import type {RequestHandler} from 'express';
-import apiStorage from './api/apiStorage.ts';
+import apiStorage from '../api/apiStorage.ts';
 import {ForbiddenError, UnauthorizedError} from 'woltage';
 
 /**
@@ -10,7 +10,7 @@ import {ForbiddenError, UnauthorizedError} from 'woltage';
  */
 
 const AUTH_TOKEN_TTL_SECONDS = 60 * 30;
-export const AUTH_TOKEN_COOKIE_NAME = 'token';
+export const AUTH_TOKEN_HEADER_NAME = 'x-token';
 const PUBLIC = '_public';
 export const ROLES = Object.freeze({
     USER: 'user',
@@ -41,7 +41,7 @@ const matchRoute = (requestedRoute: string, allowedRoutes: string[]) => allowedR
 export const aclMiddlewares: RequestHandler[] = [
     // auth middleware
     (req, res, next) => {
-        const token = req.get(AUTH_TOKEN_COOKIE_NAME);
+        const token = req.get(AUTH_TOKEN_HEADER_NAME);
         req.user = token
             ? verifyToken(token) as NonNullable<typeof req['user']>
             : null;
@@ -56,6 +56,7 @@ export const aclMiddlewares: RequestHandler[] = [
             return next();
         if(req.user === null)
             throw new UnauthorizedError();
+        console.log(req.user.roles);
         if(req.user.roles.some(role => matchRoute(req.path, PERMISSIONS[role])))
             return next();
         throw new ForbiddenError();

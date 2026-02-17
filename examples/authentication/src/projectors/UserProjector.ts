@@ -1,7 +1,7 @@
 import {Projector, z} from 'woltage';
 import type MongoDBStore from '@woltage/store-mongodb';
 import UserRegistered from '../events/user/UserRegistered.ts';
-import {ROLES, AVAILABLE_ROLES} from '../ACL.ts';
+import {ROLES, AVAILABLE_ROLES} from '../utils/ACL.ts';
 import UserRoleAdded from '../events/user/UserRoleAdded.ts';
 import UserRoleRemoved from '../events/user/UserRoleRemoved.ts';
 
@@ -12,7 +12,7 @@ const schema = {
         }),
         schema: z.object({
             userId: z.uuid(),
-            registeredAt: z.number()
+            registeredAt: z.date()
         })
     },
     users: {

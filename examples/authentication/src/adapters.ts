@@ -7,7 +7,7 @@ export const eventStore = {
     args: [process.env.KURRENT_CONNECTION_STRING]
 };
 
-export default {
+export const stores = {
     redis: {
         adapter: RedisStore,
         args: [
@@ -17,7 +17,7 @@ export default {
     mongo: {
         adapter: MongoDBStore,
         args: [
-            process.env.MONGO_CONNECTION_STRING,
+            process.env.MONGO_CONNECTION_STRING
             // {}
         ]
     }

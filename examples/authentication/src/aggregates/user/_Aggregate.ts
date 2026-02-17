@@ -1,6 +1,6 @@
 import {Aggregate} from 'woltage';
 import UserRegistered from '../../events/user/UserRegistered.ts';
-import {ROLES, type Role} from '../../ACL.ts';
+import {ROLES, type Role} from '../../utils/ACL.ts';
 import UserRoleAdded from '../../events/user/UserRoleAdded.ts';
 
 export default Aggregate.create('user', {

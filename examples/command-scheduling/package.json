@@ -1,0 +1,25 @@
+{
+  "name": "woltage-example-command-scheduling",
+  "version": "1.0.0",
+  "main": "src/index.js",
+  "private": true,
+  "scripts": {
+    "start": "node --watch src/index.ts",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "wesone",
+  "license": "ISC",
+  "type": "module",
+  "description": "",
+  "dependencies": {
+    "@woltage/eventstore-kurrentdb": "file:../../packages/eventstore-kurrentdb",
+    "@woltage/scheduler-amqp": "file:../../packages/scheduler-amqp",
+    "@woltage/store-mongodb": "file:../../packages/store-mongodb",
+    "@woltage/store-redis": "file:../../packages/store-redis",
+    "woltage": "file:../../packages/woltage"
+  },
+  "devDependencies": {
+    "@types/node": "^25.2.3",
+    "typescript": "^5.9.3"
+  }
+}

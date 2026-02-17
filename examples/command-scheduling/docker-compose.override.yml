@@ -1,0 +1,10 @@
+services:
+  app:
+    extends:
+      file: ../docker-compose.base.yml
+      service: app
+    working_dir: /usr/src/app/examples/command-scheduling
+    environment:
+      - AMQP_URL=amqp://amqp
+    depends_on:
+      - amqp

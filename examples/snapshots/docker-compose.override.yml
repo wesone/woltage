@@ -1,0 +1,6 @@
+services:
+  app:
+    extends:
+      file: ../docker-compose.base.yml
+      service: app
+    working_dir: /usr/src/app/examples/snapshots

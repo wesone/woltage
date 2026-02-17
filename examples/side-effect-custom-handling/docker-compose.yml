@@ -1,0 +1,15 @@
+include:
+  - ../docker-compose.base.yml
+
+services:
+  amqp:
+    image: cloudamqp/lavinmq:latest
+    ports:
+      - 5672:5672
+      - 15672:15672
+    volumes:
+      - lavinmq-data:/var/lib/lavinmq/data
+    restart: always
+
+volumes:
+  lavinmq-data:

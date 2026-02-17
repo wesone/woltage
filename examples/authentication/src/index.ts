@@ -1,8 +1,8 @@
 import createWoltage from 'woltage';
-import stores, {eventStore} from './stores.ts';
+import {eventStore, stores} from './adapters.ts';
 import createServer from './api/server.ts';
 import addProjections from './defaultProjections.ts';
-import {ROLES} from './ACL.ts';
+import {ROLES} from './utils/ACL.ts';
 import UserAggregate from './aggregates/user/_Aggregate.ts';
 
 // init woltage
@@ -29,8 +29,7 @@ const adminUser = {
 };
 await woltage.executeCommand(UserAggregate, adminUser.id, 'register', adminUser)
     .then(() => woltage.executeCommand(UserAggregate, adminUser.id, 'addRole', {role: ROLES.ADMIN}))
-    // the user may already exists
-    .catch(() => {});
+    .catch(() => {}); // the user may already exist
 
 // start the api
 const {server} = await createServer({port: 3000}, woltage);

@@ -1,6 +1,6 @@
 import {validate, z} from 'woltage';
 import type {APIHandler} from '../../server.ts';
-import stores from '../../../stores.ts';
+import {stores} from '../../../adapters.ts';
 
 type StoreName = keyof typeof stores;
 
