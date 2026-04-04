@@ -6,8 +6,9 @@ import type Projector from './read/Projector.ts';
 import type ReadModel from './read/ReadModel.ts';
 import type Aggregate from './write/Aggregate.ts';
 import type {SnapshotConfig} from './write/Snapshotter.ts';
+import type {EventCastingFallback} from './EventCaster.ts';
 
-export type AdapterConfig<T extends new (...args: any) => any = any> = {
+export type AdapterConfig<T extends new (...args: any) => unknown = any> = {
     adapter: T,
     args: ConstructorParameters<T>
 };
@@ -68,5 +69,9 @@ export type WoltageConfig = {
      * A custom scheduler adapter to use for scheduling commands.
      * Without a scheduler adapter, the scheduling feature is disabled.
      */
-    scheduler?: SchedulerAdapterConfig
+    scheduler?: SchedulerAdapterConfig,
+    /**
+     *
+     */
+    eventCastingFallback?: EventCastingFallback
 }

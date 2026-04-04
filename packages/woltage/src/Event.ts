@@ -1,28 +1,32 @@
 import {randomUUID} from 'crypto';
-import z from 'zod';
 import {projectionStorage} from './localStorages.ts';
 import {getEventClass} from './eventMap.ts';
+import type {StandardSchemaV1} from './adapters/standard-schema.ts';
 
-export type EventInitData<TPayload extends z.ZodType = any, TMeta = any> = {
+export type PayloadSchema = StandardSchemaV1;
+
+export type EventInitData<TPayload extends PayloadSchema = any, TMeta = any> = {
     aggregateId?: string,
-    payload: z.infer<TPayload>,
+    payload: StandardSchemaV1.InferInput<TPayload>,
     meta?: TMeta
 };
 
-export type EventData<TPayload extends z.ZodType = any, TMeta = any> = {
+export type EventData<TPayload extends PayloadSchema = any, TMeta = any> = {
     id: string,
     type: string,
     version: number,
     timestamp: string,
     aggregateId: string,
-    payload: z.infer<TPayload>,
+    payload: StandardSchemaV1.InferOutput<TPayload>,
     correlationId: string,
     causationId: string | null,
     meta: TMeta,
     position: bigint
 };
 
-export type EventConstructionData<TPayload extends z.ZodType, TMeta = any> = EventData<TPayload, TMeta> | EventInitData<TPayload, TMeta>;
+export type SerializedEventData<TPayload extends PayloadSchema = any, TMeta = any> = Omit<EventData<TPayload, TMeta>, 'position'> & {position: string};
+
+export type EventConstructionData<TPayload extends PayloadSchema, TMeta = any> = EventData<TPayload, TMeta> | EventInitData<TPayload, TMeta>;
 
 export type EventIdentityData<T extends typeof Event = any> = {
     type: T['type'],
@@ -31,7 +35,9 @@ export type EventIdentityData<T extends typeof Event = any> = {
 
 export type EventIdentity<T extends typeof Event = any> = `{"type":"${T['type']}","version":${T['version']}}`;
 
-export default class Event<TPayload extends z.ZodType = any, TMeta = any>
+const identityCache: WeakMap<any, EventIdentity> = new WeakMap();
+
+export default class Event<TPayload extends PayloadSchema = any, TMeta = any>
 {
     /**
      * @see https://github.com/Microsoft/TypeScript/issues/3841#issuecomment-337560146
@@ -39,7 +45,7 @@ export default class Event<TPayload extends z.ZodType = any, TMeta = any>
      */
     declare ['constructor']: typeof Event;
 
-    static readonly schema: z.ZodType = z.any();
+    static readonly schema: PayloadSchema;
     static readonly version: number = -1;
 
     static toString() {
@@ -54,21 +60,32 @@ export default class Event<TPayload extends z.ZodType = any, TMeta = any>
     }
 
     static get identity() {
-        return JSON.stringify({
-            type: this.type,
-            version: this.version
-        }) as EventIdentity; // passing `this` as the generic type argument to EventIdentity is currently not possible
+        let identity = identityCache.get(this);
+        if(!identity)
+        {
+            identity = JSON.stringify({
+                type: this.type,
+                version: this.version
+            }) as EventIdentity;
+            identityCache.set(this, identity);
+        }
+        return identity;
     }
 
     static validate(payload: unknown) {
-        return this.schema.parse(payload);
+        const result = this.schema['~standard'].validate(payload);
+        if(result instanceof Promise)
+            throw new Error('Async validation of event schema is not supported.');
+        if(result.issues)
+            throw new Error(`Event '${this.getDisplayName()}' validation failed.\n${JSON.stringify(result.issues, null, 2)}`);
+        return result.value;
     }
 
-    static fromJSON(data: EventData | Event, shouldValidate: boolean = false) {
-        return new (getEventClass(data.type, data.version))(
-            'toJSON' in data ? data.toJSON() : data,
-            shouldValidate
-        );
+    static fromJSON(data: SerializedEventData | EventData | Event, shouldValidate: boolean = false) {
+        const eventData = 'toJSON' in data ? data.toJSON() : data;
+        if(typeof eventData.position === 'string')
+            eventData.position = BigInt(eventData.position.slice(0, -1));
+        return new (getEventClass(data.type, data.version))(eventData, shouldValidate);
     }
 
     static getDisplayName(type = this.type, version = this.version) {
@@ -78,7 +95,7 @@ export default class Event<TPayload extends z.ZodType = any, TMeta = any>
     id;
     timestamp;
     aggregateId;
-    payload: z.infer<TPayload>;
+    payload: StandardSchemaV1.InferOutput<TPayload>;
     correlationId: string;
     causationId: string | null;
     meta: TMeta;
@@ -87,8 +104,8 @@ export default class Event<TPayload extends z.ZodType = any, TMeta = any>
     constructor(data: EventConstructionData<TPayload, TMeta>, shouldValidate: boolean = true) {
         if(typeof this.version !== 'number' || this.version <= 0)
             throw new Error('Event\'s version property must be a number > 0.');
-        if(!(this.constructor.schema instanceof z.ZodType))
-            throw new Error(`Schema for event class '${this.getDisplayName()}' needs to be a ZodType.`);
+        if(typeof this.constructor?.schema['~standard']?.validate !== 'function')
+            throw new Error(`Schema for event class '${this.getDisplayName()}' needs to be Standard Schema compliant.`);
         if('type' in data && this.type !== data.type)
             throw new Error(`Event type does not match event data ("${this.type}" not equal "${data.type}").`);
         if('version' in data && this.version !== data.version)
@@ -112,11 +129,11 @@ export default class Event<TPayload extends z.ZodType = any, TMeta = any>
         const currentEvent = projectionStorage.getStore()?.currentEvent;
         this.correlationId = correlationId ?? currentEvent?.correlationId ?? id;
         this.causationId = causationId ?? currentEvent?.id ?? null;
-        this.meta = meta;
+        this.meta = meta as TMeta;
         this.position = position;
 
         this.payload = shouldValidate
-            ? this.constructor.validate(data.payload) as z.infer<TPayload>
+            ? this.constructor.validate(data.payload)
             : data.payload;
     }
 
@@ -149,7 +166,7 @@ export default class Event<TPayload extends z.ZodType = any, TMeta = any>
             correlationId: this.correlationId,
             causationId: this.causationId,
             meta: this.meta,
-            position: this.position
+            position: `${this.position}n`
         };
     }
 

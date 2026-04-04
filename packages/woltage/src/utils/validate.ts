@@ -1,16 +1,10 @@
-import z from 'zod';
+import type {StandardSchemaV1} from '../adapters/standard-schema.ts';
 import BadRequestError from '../errors/BadRequestError.ts';
 
-export default function validate<TSchema extends z.ZodType>(schema: TSchema, data: any): z.infer<TSchema>
+export default async function validate<TSchema extends StandardSchemaV1>(schema: TSchema, data: unknown): Promise<StandardSchemaV1.InferOutput<TSchema>>
 {
-    try
-    {
-        return schema.parse(data);
-    }
-    catch(e)
-    {
-        if(e instanceof z.ZodError)
-            throw new BadRequestError(JSON.stringify(e.issues));
-        throw e;
-    }
+    const result = await schema['~standard'].validate(data);
+    if(result.issues)
+        throw new BadRequestError(JSON.stringify(result.issues, null, 2));
+    return result.value;
 }

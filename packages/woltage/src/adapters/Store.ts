@@ -1,14 +1,14 @@
-import type z from 'zod';
+import type {StandardSchemaV1} from './standard-schema.ts';
 
-export type TableDefinition = {
-    key: z.ZodObject<any>,
-    schema?: z.ZodObject<any>
+export type TableDefinition<T extends StandardSchemaV1<object, any> = StandardSchemaV1<object, any>> = {
+    key: T,
+    schema?: T
 };
-export type TableDefinitionMap = Record<string, TableDefinition>;
+export type TableDefinitionMap<T extends StandardSchemaV1<object, any> = StandardSchemaV1<object, any>> = Record<string, TableDefinition<T>>;
 
-export type TableKey<Def extends TableDefinition> = z.infer<Def['key']>;
-export type TableEntry<Def extends TableDefinition> = z.infer<Def['schema'] extends z.ZodObject<any> ? Def['key'] & Def['schema'] : Def['key']>;
-export type TablePartialEntry<Def extends TableDefinition> = Def['schema'] extends z.ZodObject<any> ? Partial<z.infer<Def['schema']>> : never;
+export type TableKey<Def extends TableDefinition> = StandardSchemaV1.InferOutput<Def['key']>;
+export type TableEntry<Def extends TableDefinition> = StandardSchemaV1.InferOutput<Def['schema'] extends StandardSchemaV1<object> ? Def['key'] & Def['schema'] : Def['key']>;
+export type TablePartialEntry<Def extends TableDefinition> = Def['schema'] extends StandardSchemaV1<object> ? Partial<StandardSchemaV1.InferOutput<Def['schema']>> : never;
 
 export interface ITable<Def extends TableDefinition> {
     set(entry: TableEntry<Def>): Promise<void>

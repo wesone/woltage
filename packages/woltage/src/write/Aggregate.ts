@@ -1,4 +1,4 @@
-import z from 'zod';
+import type {StandardSchemaV1} from '../adapters/standard-schema.ts';
 import NotFoundError from '../errors/NotFoundError.ts';
 import Event from '../Event.ts';
 import type {EventIdentity} from '../Event.ts';
@@ -11,6 +11,7 @@ import {readContext, executionStorage} from '../localStorages.ts';
 import validate from '../utils/validate.ts';
 import type {SnapshotConfig} from './Snapshotter.ts';
 import Snapshotter from './Snapshotter.ts';
+import type {EventCastingFallback} from '../EventCaster.ts';
 
 export type AggregateProjector<TState = any> = {
     /**
@@ -54,7 +55,7 @@ export type AggregateStatus<TState = any> = {
     revision: AppendRevision,
 }
 
-export type CommandContext<TContext extends object = Record<string, never>> = TContext & {
+export type CommandContext<TContext extends object = Record<string, any>> = TContext & {
     aggregateId: string,
     aggregateVersion: number
 };
@@ -72,7 +73,7 @@ export type StateUpdateConfig = {
 
 export type StateUpdate = Event | Event[] | StateUpdateConfig;
 
-export type Command<TState, TPayload extends z.ZodType = any> = (state: TState, payload: z.infer<TPayload>, context: CommandContext) => Promise<StateUpdate | void> | StateUpdate | void;
+export type Command<TState, TPayload extends StandardSchemaV1 = any> = (state: TState, payload: StandardSchemaV1.InferInput<TPayload>, context: CommandContext) => Promise<StateUpdate | void> | StateUpdate | void;
 
 export type CommandOptions = {
     /**
@@ -82,7 +83,7 @@ export type CommandOptions = {
     name?: string
 };
 
-export type CommandInfo<TState, TPayload extends z.ZodType = any> = {
+export type CommandInfo<TState, TPayload extends StandardSchemaV1 = any> = {
     aggregate: Aggregate<TState>,
     name: string,
     schema: TPayload,
@@ -102,7 +103,7 @@ class Aggregate<TState = any>
     projector;
     options;
     #registry;
-    #commands: {[commandName: string]: {schema: z.ZodType, command: Command<TState>, options: CommandOptions}} = {};
+    #commands: {[commandName: string]: {schema: StandardSchemaV1, command: Command<TState>, options: CommandOptions}} = {};
     snapshotter;
 
     private constructor(type: string, projector: AggregateProjector<TState>, options: AggregateOptions = {}) {
@@ -117,14 +118,18 @@ class Aggregate<TState = any>
         return this.#type;
     }
 
+    setEventCastingFallback(fallback?: EventCastingFallback) {
+        this.#registry.setEventCastingFallback(fallback);
+    }
+
     registerCommand(command: Command<TState>, options?: CommandOptions): CommandInfo<TState>;
-    registerCommand<TPayload extends z.ZodType = any>(schema: TPayload, command: Command<TState, TPayload>, options?: CommandOptions): CommandInfo<TState, TPayload>;
+    registerCommand<TPayload extends StandardSchemaV1 = any>(schema: TPayload, command: Command<TState, TPayload>, options?: CommandOptions): CommandInfo<TState, TPayload>;
     registerCommand(schema: any, command: any, options?: any) {
         if(typeof schema === 'function')
         {
             options = command;
             command = schema;
-            schema = z.any();
+            schema = null;
         }
         options ??= {};
 
@@ -187,12 +192,14 @@ class Aggregate<TState = any>
         );
     }
 
-    async executeCommand(aggregateId: string, commandName: string, payload: any) {
+    async executeCommand(aggregateId: string, commandName: string, payload: unknown) {
         if(!this.#commands[commandName])
             throw new NotFoundError(`Command ${commandName} not found for aggregate ${this.type}.`);
 
         const {schema, command/* , options */} = this.#commands[commandName];
-        payload = validate(schema, payload);
+        payload = schema
+            ? await validate(schema, payload)
+            : payload;
 
         const {state, revision, aggregateVersion, postHydrationPromise} = await this.#getStatus(aggregateId);
         const {eventStore, context} = readContext(executionStorage);
@@ -200,7 +207,7 @@ class Aggregate<TState = any>
             state,
             payload,
             Object.freeze({
-                ...(context as any ?? {}),
+                ...(context ?? {}),
                 aggregateId,
                 aggregateVersion
             })

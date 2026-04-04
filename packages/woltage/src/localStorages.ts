@@ -27,7 +27,7 @@ export const projectionStorage = new AsyncLocalStorage<ProjectionContext>();
 export type ExecutionContext = {
     eventStore: IEventStore,
     readModelMap: Record<string, ReadModel>,
-    projectionMap: ProjectionMap['activeProjectionMap'],
+    projectionMap: ProjectionMap['activeProjections'],
     context?: Context
 };
 

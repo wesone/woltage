@@ -13,6 +13,8 @@ export * from './src/adapters/Store.ts';
 
 export type * from './src/Event.ts';
 export {default as Event} from './src/Event.ts';
+export * from './src/EventCaster.ts';
+export {default as EventCaster} from './src/EventCaster.ts';
 export type * from './src/write/Aggregate.ts';
 export {default as Aggregate} from './src/write/Aggregate.ts';
 export {default as Projector} from './src/read/Projector.ts';
@@ -27,8 +29,10 @@ export {default as scheduleCommand} from './src/sideEffects/scheduleCommand.ts';
 export {default as getProjectionContext} from './src/read/getProjectionContext.ts';
 
 export {default as validate} from './src/utils/validate.ts';
+export {default as importModules} from './src/utils/importModules.ts';
 
 export type * from './src/WoltageConfig.ts';
 export {default, type Woltage} from './src/Woltage.ts';
 
 export {default as z} from 'zod';
+export type {StandardSchemaV1} from './src/adapters/standard-schema.ts';

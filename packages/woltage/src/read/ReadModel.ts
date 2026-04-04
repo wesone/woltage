@@ -2,7 +2,7 @@ import type Projector from './Projector.ts';
 import {executionStorage} from '../localStorages.ts';
 import NotFoundError from '../errors/NotFoundError.ts';
 import validate from '../utils/validate.ts';
-import type z from 'zod';
+import type {StandardSchemaV1} from '../adapters/standard-schema.ts';
 
 abstract class ReadModel<TProjector extends Projector<any> = any>
 {
@@ -34,7 +34,7 @@ abstract class ReadModel<TProjector extends Projector<any> = any>
      * The key must be the name of one of the handler functions and the value is the schema.
      * The query parameter that will be passed to the handler function will be validated automatically.
      */
-    readonly schemaRegistry: Partial<Record<string, z.ZodType>> = {};
+    readonly schemaRegistry: Partial<Record<string, StandardSchemaV1>> = {};
 
     get store(): TProjector['store'] {
         const projectionMap = executionStorage.getStore()?.projectionMap;
@@ -46,6 +46,10 @@ abstract class ReadModel<TProjector extends Projector<any> = any>
         return projection.projector.store;
     }
 
+    get tables(): TProjector['store']['tables'] {
+        return this.store.tables;
+    }
+
     async call(handlerName: string, query: any) {
         if(!(handlerName in this) || Object.getOwnPropertyNames(ReadModel.prototype).includes(handlerName))
             throw new NotFoundError(`Handler '${handlerName}' of read model '${this.constructor.name}' not found.`);
@@ -53,7 +57,7 @@ abstract class ReadModel<TProjector extends Projector<any> = any>
         if(handler instanceof Function)
         {
             if(handler.name in this.schemaRegistry)
-                query = this.validate(this.schemaRegistry[handler.name]!, query);
+                query = await this.validate(this.schemaRegistry[handler.name]!, query);
             const context = Object.freeze({
                 ...(executionStorage.getStore()?.context ?? {})
             });

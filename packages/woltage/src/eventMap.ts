@@ -1,7 +1,7 @@
 import Event from './Event.ts';
 import z from 'zod';
 
-type EventMap = {
+export type EventMap = {
     [eventType: string]: {
         [eventVersion: number]: typeof Event
     }

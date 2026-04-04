@@ -1,3 +1,4 @@
+import {EventEmitter} from 'node:events';
 import z from 'zod';
 import type Projector from './Projector.ts';
 import {projectionStorage} from '../localStorages.ts';
@@ -19,7 +20,7 @@ const configDefinition = {
     }
 };
 
-class Projection
+class Projection extends EventEmitter<{replayed: [position: bigint]}>
 {
     static getId(name: string, version: number) {
         return `${name}-${version}`;
@@ -48,8 +49,9 @@ class Projection
         name: string,
         version: number,
         ProjectorClass: typeof Projector,
-        store: IStore<typeof configDefinition>
+        store: IStore
     ) {
+        super();
         this.#woltage = woltage;
         this.#eventStore = eventStore;
         this.id = Projection.getId(name, version);
@@ -57,7 +59,7 @@ class Projection
         this.version = version;
 
         store.defineTables(configDefinition);
-        this.projector = new ProjectorClass<typeof configDefinition>(store);
+        this.projector = new ProjectorClass<typeof configDefinition>(store as IStore<typeof configDefinition>, woltage.config.eventCastingFallback);
     }
 
     get isReplaying() {
@@ -72,7 +74,7 @@ class Projection
         const filter = {types: this.projector.types};
 
         this.#latestPosition = await this.#eventStore.getLatestPosition(filter) ?? -1n;
-        const startPosition = (await this.projector.store.tables[configPrefix].get({projectionId: this.id}))?.position;
+        const startPosition = (await this.projector.tables[configPrefix].get({projectionId: this.id}))?.position;
         // if stored position is same as latestPosition update isReplaying and isLiveTracking immediately
         if(startPosition && startPosition >= this.#latestPosition || this.#latestPosition < 0n)
             this.#onReplayed();
@@ -83,8 +85,8 @@ class Projection
         });
         this.#subscription.on('data', async event => {
             this.#subscription?.pause();
-            this.#updatePosition(event.position);
             await this.onEvent(event);
+            this.#updatePosition(event.position);
             this.#subscription?.resume();
         });
     }
@@ -95,12 +97,12 @@ class Projection
     }
 
     #updatePosition(currentPosition: bigint) {
-        if(currentPosition > this.#latestPosition)
+        if(currentPosition >= this.#latestPosition && this.isReplaying)
         {
-            this.#latestPosition = currentPosition;
-            if(this.isReplaying)
-                this.#onReplayed();
+            this.#onReplayed();
+            this.emit('replayed', currentPosition);
         }
+        this.#latestPosition = currentPosition;
     }
 
     async onEvent(event: Event) {
@@ -116,7 +118,7 @@ class Projection
             () => this.projector.onEvent(event)
         );
         // if the framework should handle idempotency, we would need to update the projection and save the handled position transactionally
-        await this.projector.store.tables[configPrefix].set({
+        await this.projector.tables[configPrefix].set({
             projectionId: this.id,
             position: event.position
         });
