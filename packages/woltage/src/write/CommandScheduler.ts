@@ -9,7 +9,7 @@ class CommandScheduler
     #isRunning = false;
 
     constructor(adapterConfig: SchedulerAdapterConfig, callback: SchedulerCallback) {
-        this.scheduler = constructAdapter<new(...args: any) => IScheduler>(adapterConfig);
+        this.scheduler = constructAdapter<new(...args: unknown[]) => IScheduler>(adapterConfig);
         this.callback = callback;
     }
 

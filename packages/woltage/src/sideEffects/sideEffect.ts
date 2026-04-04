@@ -1,8 +1,8 @@
 import {projectionStorage} from '../localStorages.ts';
 
-export type SideEffectFunction<TArgs extends any[]> = (...args: TArgs) => void | Promise<void>;
+export type SideEffectFunction<TArgs extends any[] = any[], TReturn extends (void | Promise<void>) = void | Promise<void>> = (...args: TArgs) => TReturn;
 
-export default function sideEffect<TArgs extends any[]>(fn: SideEffectFunction<TArgs>): SideEffectFunction<TArgs>
+export default function sideEffect<TArgs extends any[], TReturn extends(void | Promise<void>)>(fn: SideEffectFunction<TArgs, TReturn>): SideEffectFunction<TArgs, Promise<void>>
 {
     return async (...args) => {
         const store = projectionStorage.getStore();

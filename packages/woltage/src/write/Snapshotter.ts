@@ -83,7 +83,7 @@ class Snapshotter
     }
 
     async get(aggregateId: string) {
-        return await this.#store?.tables.snapshots.get({aggregateId}) ?? null;
+        return this.#store?.tables.snapshots.get({aggregateId}) ?? null;
     }
 
     async remove(aggregateId: string) {
