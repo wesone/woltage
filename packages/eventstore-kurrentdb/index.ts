@@ -44,7 +44,7 @@ type SerializedJSONEvent = JSONEventOptions<{
         aggregateId: string;
         correlationId: string;
         causationId: string | null;
-        meta: any;
+        meta: unknown;
     };
     position: Position;
 }>;

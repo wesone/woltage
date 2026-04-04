@@ -33,8 +33,8 @@ export default class ComposedEventStore implements IEventStore
     bus;
 
     constructor(
-        log: AdapterConfig<new (...args: any) => IEventLog>,
-        bus: AdapterConfig<new (...args: any) => IEventBus>
+        log: AdapterConfig<new (...args: unknown[]) => IEventLog>,
+        bus: AdapterConfig<new (...args: unknown[]) => IEventBus>
     ) {
         this.log = new log.adapter(...(log.args ?? []));
         this.bus = new bus.adapter(...(bus.args ?? []));
