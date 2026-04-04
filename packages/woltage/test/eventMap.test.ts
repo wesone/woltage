@@ -3,14 +3,14 @@ import assert from 'node:assert/strict';
 import eventMap, {registerEventClasses, getEventClass} from '../src/eventMap.ts';
 import mockEventClass from './_mock/mockEventClass.ts';
 
-describe('eventMap', async () => {
+await describe('eventMap', async () => {
     afterEach(() => {
         for(const key in eventMap)
             delete eventMap[key];
     });
 
-    describe('registerEventClasses', async () => {
-        await it('checks for duplicate events', async () => {
+    await describe('registerEventClasses', async () => {
+        await it('throws error for duplicate events', async () => {
             assert.throws(() => {
                 registerEventClasses([
                     mockEventClass('test.event', 1),
@@ -30,7 +30,7 @@ describe('eventMap', async () => {
         });
     });
 
-    describe('getEventClass', async () => {
+    await describe('getEventClass', async () => {
         await it('returns an event class even for unregistered event classes', async () => {
             const testEvent = mockEventClass('test.event', 2);
             registerEventClasses([

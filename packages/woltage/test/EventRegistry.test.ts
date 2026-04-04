@@ -1,13 +1,12 @@
-import {describe, it, mock, after, type Mock} from 'node:test';
+import {describe, it, mock, after} from 'node:test';
 import assert from 'node:assert/strict';
 
 import EventRegistry from '../src/EventRegistry.ts';
 import mockEventClass from './_mock/mockEventClass.ts';
 
-import EventCaster from '../src/EventCaster.ts';
 import Event from '../src/Event.ts';
 
-describe('EventRegistry', async () => {
+await describe('EventRegistry', async () => {
     after(() => mock.reset());
 
     await it('can be created with a plain object', async () => {
@@ -30,7 +29,7 @@ describe('EventRegistry', async () => {
             '{"type":"","version":21}'() {};
         }
         assert.deepStrictEqual(new EventRegistry(TestClass).types, [], 'EventRegistry has unexpected types');
-        assert.deepStrictEqual(new EventRegistry(TestClass, TestClass.prototype).types, ['test.identity'], 'EventRegistry has unexpected types');
+        assert.deepStrictEqual(new EventRegistry(TestClass, {proto: TestClass.prototype}).types, ['test.identity'], 'EventRegistry has unexpected types');
     });
 
     await it('will return the correct handler based on an event', async () => {
@@ -61,24 +60,20 @@ describe('EventRegistry', async () => {
     });
 
     await it('will cast an event if no handler for that version is registered', async () => {
-        mock.method(
-            EventCaster,
-            'cast',
-            (event: Event, targetVersion: number) => {
-                const EventClass = mockEventClass(event.type, targetVersion);
-                return new EventClass({...event.toJSON(), version: targetVersion});
-            }
-        );
+        const eventCastingFallback = mock.fn(async (event: Event, targetVersion: number) => {
+            const EventClass = mockEventClass(event.type, targetVersion);
+            return new EventClass({...event.toJSON(), version: targetVersion});
+        });
 
         const TestEvent1 = mockEventClass('test.event', 1);
         const handler1 = mock.fn();
         const TestEvent2 = mockEventClass('test.event', 2);
         const registry = new EventRegistry({
             [TestEvent1.identity]: handler1
-        });
+        }, {eventCastingFallback});
 
         (await registry.get(new TestEvent2({aggregateId: 'aggregateId1', payload: {}}))).handler?.();
         assert.strictEqual(handler1.mock.callCount(), 1);
-        assert.strictEqual((EventCaster.cast as Mock<typeof EventCaster.cast>).mock.callCount(), 1);
+        assert.strictEqual(eventCastingFallback.mock.callCount(), 1);
     });
 });

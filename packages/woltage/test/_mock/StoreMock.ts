@@ -1,5 +1,6 @@
 import {type Mock, mock} from 'node:test';
 import type {IStore, ITable, TableDefinition, TableEntry, TableKey, TablePartialEntry, TableDefinitionMap} from '../../src/adapters/Store';
+import validate from '../../src/utils/validate.ts';
 
 class TableMock<Def extends TableDefinition> implements ITable<Def> {
     name: string;
@@ -16,13 +17,12 @@ class TableMock<Def extends TableDefinition> implements ITable<Def> {
         this.definition = definition;
 
         this.set = mock.fn(
-            (entry: TableEntry<Def>) => {
-                this.records[this.#generateKey(entry)] = entry;
-                return Promise.resolve();
+            async (entry: TableEntry<Def>) => {
+                this.records[await this.#generateKey(entry)] = entry;
             }
         );
         this.get = mock.fn(
-            (key: TableKey<Def>) => Promise.resolve(this.records[this.#generateKey(key)] ?? null)
+            async (key: TableKey<Def>) => this.records[await this.#generateKey(key)] ?? null
         );
         this.update = mock.fn(
             async (key: TableKey<Def>, values: TablePartialEntry<Def>) => {
@@ -33,19 +33,18 @@ class TableMock<Def extends TableDefinition> implements ITable<Def> {
             }
         );
         this.remove = mock.fn(
-            (key: TableKey<Def>) => {
-                delete this.records[this.#generateKey(key)];
-                return Promise.resolve();
+            async (key: TableKey<Def>) => {
+                delete this.records[await this.#generateKey(key)];
             }
         );
     }
 
-    #serialize(value: any) {
+    #serialize(value: unknown) {
         return JSON.stringify(value, (k, v) => typeof v === 'bigint' ? `${v.toString()}n` : v);
     }
 
-    #generateKey(tableKey: TableKey<Def>) {
-        const key = this.definition.key.parse(tableKey);
+    async #generateKey(tableKey: TableKey<Def>) {
+        const key = await validate(this.definition.key, tableKey);
         return this.#serialize(
             Object.fromEntries(
                 Object.entries(key)

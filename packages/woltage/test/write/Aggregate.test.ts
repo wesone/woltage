@@ -2,7 +2,7 @@ import {describe, it, mock, afterEach} from 'node:test';
 import assert from 'node:assert/strict';
 
 import Aggregate from '../../src/write/Aggregate.ts';
-import eventStore from '../_mock/eventStore.ts';
+import eventStore from '../_mock/eventStoreMock.ts';
 import mockEventClass from '../_mock/mockEventClass.ts';
 import {executionStorage} from '../../src/localStorages.ts';
 import {STATE_NEW} from '../../src/adapters/EventStore.ts';
@@ -10,7 +10,7 @@ import z from 'zod';
 import StoreMock from '../_mock/StoreMock.ts';
 import {snapshotSchema} from '../../src/write/Snapshotter.ts';
 
-describe('Aggregate', async () => {
+await describe('Aggregate', async () => {
     afterEach(() => eventStore.mockReset());
 
     await it('can be created', async () => {
@@ -223,7 +223,43 @@ describe('Aggregate', async () => {
         await assert.rejects(() => aggregate.executeCommand(aggregateId, command.name, {}));
     });
 
-    describe('commands', async () => {
+    await it('uses eventCastingFallback when set', async () => {
+        (executionStorage as any).enterWith({eventStore});
+
+        const EventV1 = mockEventClass('test.event', 1);
+        const EventV2 = mockEventClass('test.event', 2);
+        const aggregateType = 'test';
+        const aggregateId = 'aggregateId1';
+
+        eventStore.mock({
+            [aggregateType]: [
+                new EventV2({aggregateId, payload: {value: 'v2'}})
+            ]
+        });
+
+        const handler = mock.fn(() => {});
+        const aggregate = Aggregate.create(aggregateType, {
+            [EventV1.identity]: handler
+        });
+
+        const castFallback = mock.fn(async (event, targetVersion) => {
+            const EventClass = targetVersion === 1 ? EventV1 : EventV2;
+            return new EventClass({...event.toJSON(), version: targetVersion});
+        });
+
+        aggregate.setEventCastingFallback(castFallback);
+
+        const command = mock.fn(function doSomething() {});
+        aggregate.registerCommand(command);
+
+        await aggregate.executeCommand(aggregateId, command.name, {});
+
+        assert.strictEqual(castFallback.mock.callCount(), 1);
+        assert.strictEqual(handler.mock.callCount(), 1);
+    });
+
+
+    await describe('commands', async () => {
         const initState = {test: 42};
         const aggregate = Aggregate.create('test', {
             $init() {return initState;}

@@ -6,7 +6,7 @@ import mockEventClass from '../_mock/mockEventClass.ts';
 import mockProjectionContext from '../_mock/mockProjectionContext.ts';
 import type Projection from '../../src/read/Projection.ts';
 
-describe('sideEffect', async () => {
+await describe('sideEffect', async () => {
     const TestEvent = mockEventClass('test');
     const currentEvent = new TestEvent({
         aggregateId: 'test',

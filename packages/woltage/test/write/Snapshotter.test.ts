@@ -5,7 +5,7 @@ import Snapshotter from '../../src/write/Snapshotter.ts';
 import type {SnapshotConfig, snapshotSchema} from '../../src/write/Snapshotter.ts';
 import StoreMock from '../_mock/StoreMock.ts';
 
-describe('Snapshotter', async () => {
+await describe('Snapshotter', async () => {
     const snapshot = {
         aggregateId: 'aggregateId1',
         aggregateVersion: 1,
@@ -16,7 +16,7 @@ describe('Snapshotter', async () => {
         state: {}
     };
 
-    describe('configure', async () => {
+    await describe('configure', async () => {
         const StoreA = {adapter: StoreMock, args: ['storeA']};
         const StoreB = {adapter: StoreMock, args: ['storeB']};
 
@@ -77,7 +77,7 @@ describe('Snapshotter', async () => {
         });
     });
 
-    describe('setStore', async () => {
+    await describe('setStore', async () => {
         await it('defines tables and connects if store was provided', async () => {
             const snapshotter = new Snapshotter('test');
             const storeMock = new StoreMock();
@@ -103,10 +103,11 @@ describe('Snapshotter', async () => {
     await it('set - creates a new snapshot in its store', async () => {
         const snapshotter = new Snapshotter('test');
         const storeMock = new StoreMock<typeof snapshotSchema>();
-        await snapshotter.set(snapshot);
+
+        await assert.doesNotReject(() => snapshotter.set(snapshot));
+
         await snapshotter.setStore(storeMock);
         await snapshotter.set(snapshot);
-
         assert.deepStrictEqual(storeMock.tables.snapshots.records['{"aggregateId":"aggregateId1"}'], snapshot);
     });
 
@@ -135,9 +136,9 @@ describe('Snapshotter', async () => {
         assert.strictEqual(await snapshotter.get(snapshot.aggregateId), null);
     });
 
-    describe('hydrateStatus', async () => {
+    await describe('hydrateStatus', async () => {
         const snapshotter = new Snapshotter('test');
-        const storeMock = new StoreMock();
+        const storeMock = new StoreMock<typeof snapshotSchema>();
         await snapshotter.setStore(storeMock);
         const exampleStatus = {
             aggregateId: snapshot.aggregateId,
@@ -169,7 +170,7 @@ describe('Snapshotter', async () => {
             assert.strictEqual(status.aggregateVersion, snapshot.aggregateVersion);
         });
 
-        describe('hydration', async () => {
+        await describe('hydration', async () => {
             const internalStoreKey = '{"aggregateId":"aggregateId1"}';
 
             await it('does not add a new snapshot if no condition was met', async () => {
@@ -221,7 +222,10 @@ describe('Snapshotter', async () => {
             await it('adds a new snapshot if duration condition was met', async () => {
                 snapshotter.configure({duration: 20, eventCount: false});
                 {
-                    const {postHydrationPromise} = await snapshotter.hydrateStatus(exampleStatus, async s => s);
+                    const {postHydrationPromise} = await snapshotter.hydrateStatus(exampleStatus, async s => ({
+                        ...s,
+                        aggregateVersion: snapshot.aggregateVersion
+                    }));
                     await postHydrationPromise;
 
                     assert.equal(Object.values(storeMock.tables.snapshots.records).length, 0);
