@@ -18,7 +18,6 @@ export const stores = {
         adapter: MongoDBStore,
         args: [
             process.env.MONGO_CONNECTION_STRING
-            // {}
         ]
     }
 };

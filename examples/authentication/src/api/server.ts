@@ -1,5 +1,5 @@
 import express from 'express';
-import type {RequestHandler} from 'express';
+import type {RequestHandler, ErrorRequestHandler} from 'express';
 import type {Woltage} from 'woltage';
 import registerMiddlewares from './registerMiddlewares.ts';
 import registerHandlers from './registerHandlers.ts';
@@ -35,8 +35,8 @@ export default async (config: ServerConfig, woltage: Woltage) => {
     registerMiddlewares(app, woltage);
     await registerHandlers(app);
 
-    // custom error handler for BadRequestError otherwise express will send error as HTML
-    app.use((err: any, req: any, res: any, next: any) => {
+    // Custom error handler for BadRequestError otherwise express will send error as HTML
+    app.use(((err, req, res, next) => {
         if(err.status === 400)
         {
             res.set('Content-Type', 'application/json');
@@ -44,7 +44,7 @@ export default async (config: ServerConfig, woltage: Woltage) => {
             return next();
         }
         next(err);
-    });
+    }) satisfies ErrorRequestHandler);
 
     const port = config.port ?? 3000;
     const server = app.listen(port, () => {

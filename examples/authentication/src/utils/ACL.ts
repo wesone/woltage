@@ -11,6 +11,7 @@ import {ForbiddenError, UnauthorizedError} from 'woltage';
 
 const AUTH_TOKEN_TTL_SECONDS = 60 * 30;
 export const AUTH_TOKEN_HEADER_NAME = 'x-token';
+
 const PUBLIC = '_public';
 export const ROLES = Object.freeze({
     USER: 'user',
@@ -24,7 +25,7 @@ const PERMISSIONS = Object.freeze({
     [ROLES.ADMIN]: ['/user/:aggregateId/addRole', '/user/:aggregateId/removeRole']
 });
 
-export const generateToken = (payload: any) => jwt.sign(payload, process.env.JWT_PRIVATE_KEY!, {expiresIn: AUTH_TOKEN_TTL_SECONDS});
+export const generateToken = (payload: object) => jwt.sign(payload, process.env.JWT_PRIVATE_KEY!, {expiresIn: AUTH_TOKEN_TTL_SECONDS});
 
 export const verifyToken = (token: string) => jwt.verify(token, process.env.JWT_PRIVATE_KEY!);
 
@@ -56,7 +57,6 @@ export const aclMiddlewares: RequestHandler[] = [
             return next();
         if(req.user === null)
             throw new UnauthorizedError();
-        console.log(req.user.roles);
         if(req.user.roles.some(role => matchRoute(req.path, PERMISSIONS[role])))
             return next();
         throw new ForbiddenError();

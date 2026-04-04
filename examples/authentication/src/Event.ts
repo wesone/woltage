@@ -11,7 +11,7 @@ export default class Event<TPayload extends z.ZodType> extends WoltageEvent<TPay
         if(!data.meta)
         {
             const {user} = apiStorage.getStore() ?? {user: {id: 'system'}};
-            data.meta = {userId: user?.id};
+            data.meta = {userId: user?.id ?? null};
         }
         super(data, shouldValidate);
     }

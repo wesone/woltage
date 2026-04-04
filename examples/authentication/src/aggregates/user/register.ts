@@ -4,7 +4,7 @@ import {generatePasswordHash} from '../../utils/password.ts';
 import UserRegistered from '../../events/user/UserRegistered.ts';
 import User from '../../readModels/User.ts';
 
-A.registerCommand(
+export default A.registerCommand(
     z.object({
         email: z.email(),
         firstName: z.string(),

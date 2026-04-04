@@ -1,11 +1,8 @@
 import createWoltage from 'woltage';
 import {eventStore, stores} from './adapters.ts';
 import createServer from './api/server.ts';
-import addProjections from './defaultProjections.ts';
-import {ROLES} from './utils/ACL.ts';
-import UserAggregate from './aggregates/user/_Aggregate.ts';
+import initExample from './initExample.ts';
 
-// init woltage
 const woltage = await createWoltage({
     eventStore,
     eventClasses: import.meta.dirname + '/events',
@@ -16,25 +13,13 @@ const woltage = await createWoltage({
     stores
 });
 
-// add default projections
-await addProjections(woltage);
+// Initialize the example with default data
+await initExample(woltage);
 
-// this will create an admin user
-const adminUser = {
-    id: '4bac06f4-6a42-4804-b920-72266139d52e',
-    email: 'admin@example.com',
-    firstName: 'Steve',
-    lastName: 'Stevenson',
-    password: '1234'
-};
-await woltage.executeCommand(UserAggregate, adminUser.id, 'register', adminUser)
-    .then(() => woltage.executeCommand(UserAggregate, adminUser.id, 'addRole', {role: ROLES.ADMIN}))
-    .catch(() => {}); // the user may already exist
-
-// start the api
+// Start the api
 const {server} = await createServer({port: 3000}, woltage);
 
-// handle a shut down
+// Handle graceful shutdown
 [
     'SIGTERM',
     'SIGINT',

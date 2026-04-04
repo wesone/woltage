@@ -54,24 +54,26 @@ export default class UserProjector extends Projector<typeof schema>
         });
     }
 
-    async updateUserRole(event: UserRoleAdded | UserRoleRemoved) {
+    async updateUserRoles(event: UserRoleAdded | UserRoleRemoved) {
         const {users} = this.store.tables;
         const {aggregateId: id, payload: {role}} = event;
         const user = await users.get({id});
+
         if(!user)
             return;
         if(event instanceof UserRoleAdded)
             user.roles.push(role);
         else
             user.roles.splice(user.roles.indexOf(role), 1);
+
         await users.set(user);
     }
 
     async [UserRoleAdded.identity](event: UserRoleAdded) {
-        await this.updateUserRole(event);
+        await this.updateUserRoles(event);
     }
 
     async [UserRoleRemoved.identity](event: UserRoleRemoved) {
-        await this.updateUserRole(event);
+        await this.updateUserRoles(event);
     }
 }

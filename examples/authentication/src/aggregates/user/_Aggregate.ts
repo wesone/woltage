@@ -2,6 +2,7 @@ import {Aggregate} from 'woltage';
 import UserRegistered from '../../events/user/UserRegistered.ts';
 import {ROLES, type Role} from '../../utils/ACL.ts';
 import UserRoleAdded from '../../events/user/UserRoleAdded.ts';
+import UserRoleRemoved from '../../events/user/UserRoleRemoved.ts';
 
 export default Aggregate.create('user', {
     $init() {
@@ -22,6 +23,10 @@ export default Aggregate.create('user', {
     },
     [UserRoleAdded.identity](state, event: UserRoleAdded) {
         state.roles.push(event.payload.role);
+        return state;
+    },
+    [UserRoleRemoved.identity](state, event: UserRoleRemoved) {
+        state.roles = state.roles.filter(r => r !== event.payload.role);
         return state;
     }
 });

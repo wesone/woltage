@@ -1,24 +1,7 @@
-export type HTTPMethod =
-    'checkout'
-    |'copy'
-    |'delete'
-    |'get'
-    |'head'
-    |'lock'
-    |'merge'
-    |'mkactivity'
-    |'mkcol'
-    |'move'
-    |'m-search'
-    |'notify'
-    |'options'
-    |'patch'
-    |'post'
-    |'purge'
-    |'put'
-    |'report'
-    |'search'
-    |'subscribe'
-    |'trace'
-    |'unlock'
-    |'unsubscribe';
+import type {IRoute, IRouterHandler} from 'express';
+
+type FilterKeysByValue<T, ValueType> = {
+    [K in keyof T]: T[K] extends ValueType ? K : never;
+}[keyof T];
+
+export type HTTPMethod = FilterKeysByValue<IRoute, IRouterHandler<IRoute>>;

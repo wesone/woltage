@@ -4,7 +4,7 @@ import type {APIHandler} from '../../server.ts';
 export default {
     method: 'delete',
     handler: async (req, res) => {
-        const payload = validate(
+        const payload = await validate(
             z.object({
                 name: z.string(),
                 version: z.int()

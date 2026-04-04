@@ -3,7 +3,7 @@ import {scrypt, randomBytes, timingSafeEqual} from 'node:crypto';
 const SALT_SIZE = 16;
 
 const getHash = async (plain: string, salt: string): Promise<string> => {
-    return await new Promise((resolve, reject) =>
+    return new Promise((resolve, reject) =>
         scrypt(plain, salt, 64, (err, derivedKey) => {
             if(err)
                 reject(err);

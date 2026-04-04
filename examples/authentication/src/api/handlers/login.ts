@@ -7,7 +7,7 @@ import {AUTH_TOKEN_HEADER_NAME, generateToken} from '../../utils/ACL.ts';
 export default {
     method: 'post',
     handler: async (req, res) => {
-        const {email, password} = validate(z.object({
+        const {email, password} = await validate(z.object({
             email: z.email(),
             password: z.string()
         }), req.body);

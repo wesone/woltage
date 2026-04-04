@@ -3,7 +3,7 @@ import type UserProjector from '../projectors/UserProjector.ts';
 
 export default class User extends ReadModel<UserProjector>
 {
-    projectionName = 'user';
+    projectionName = 'users';
     schemaRegistry = {
         findOne: z.union([
             z.object({
@@ -16,14 +16,18 @@ export default class User extends ReadModel<UserProjector>
     };
 
     async isEmailAddressAvailable(email: string) {
-        return !(await this.store.tables.emails.get({email}));
+        return !(await this.tables.emails.get({email}));
     }
 
     async findOne(query: z.infer<this['schemaRegistry']['findOne']>) {
-        return await this.store.tables.users.findOne(query);
+        return this.tables.users.findOne(query);
     }
 
     async list() {
-        return this.store.tables.users.find({});
+        const cursor = this.tables.users.find();
+        const docs = [];
+        for await (const doc of cursor)
+            docs.push(doc);
+        return docs;
     }
 }
