@@ -7,6 +7,7 @@ import type {
     TableKey,
     TablePartialEntry
 } from 'woltage';
+import {validate} from 'woltage';
 import {
     Collection,
     Db,
@@ -34,29 +35,29 @@ class Table<Def extends TableDefinition> implements ITable<Def> {
         });
     }
 
-    #getKey(key: TableKey<Def>) {
+    async #getKey(key: TableKey<Def>) {
         // strip properties that are not part of the key
-        return this.definition.key.parse(key) as TableKey<Def>;
+        return validate(this.definition.key, key) as TableKey<Def>;
     }
 
     async set(entry: TableEntry<Def>) {
-        await this.collection.updateOne(this.#getKey(entry) as Filter<TableEntry<Def>>, {$set: entry}, {upsert: true});
+        await this.collection.updateOne(await this.#getKey(entry) as Filter<TableEntry<Def>>, {$set: entry}, {upsert: true});
     }
 
-    get(key: TableKey<Def>) {
-        return this.collection.findOne(this.#getKey(key) as Filter<TableKey<Def>>, {projection: {_id: 0}}) as Promise<TableEntry<Def> | null>;
+    async get(key: TableKey<Def>) {
+        return this.collection.findOne(await this.#getKey(key) as Filter<TableKey<Def>>, {projection: {_id: 0}}) as TableEntry<Def> | null;
     }
 
     async update(key: TableKey<Def>, values: TablePartialEntry<Def>) {
-        await this.collection.updateOne(this.#getKey(key) as Filter<TableKey<Def>>, {$set: values});
+        await this.collection.updateOne(await this.#getKey(key) as Filter<TableKey<Def>>, {$set: values});
     }
 
     async remove(key: TableKey<Def>) {
-        await this.collection.deleteOne(this.#getKey(key) as Filter<TableKey<Def>>);
+        await this.collection.deleteOne(await this.#getKey(key) as Filter<TableKey<Def>>);
     }
 }
 
-export default class MongoDBStore<Definitions extends TableDefinitionMap> implements IStore {
+export default class MongoDBStore<Definitions extends TableDefinitionMap> implements IStore<Definitions> {
     prefix = '';
     tables = {} as { [K in keyof Definitions]: Table<Definitions[K]> & Collection<TableEntry<Definitions[K]>>; };
     #client: MongoClient;
@@ -75,7 +76,7 @@ export default class MongoDBStore<Definitions extends TableDefinitionMap> implem
         await this.#client.close(force);
     }
 
-    defineTables(tables: any) {
+    defineTables(tables: Partial<Definitions>) {
         this.tables = Object.assign(
             this.tables ?? {},
             Object.fromEntries(

@@ -7,6 +7,7 @@ import type {
     TableKey,
     TablePartialEntry
 } from 'woltage';
+import {validate} from 'woltage';
 import {createClient, type RedisClientOptions} from 'redis';
 
 class Table<Def extends TableDefinition> implements ITable<Def> {
@@ -30,7 +31,7 @@ class Table<Def extends TableDefinition> implements ITable<Def> {
         });
     }
 
-    #serialize(value: any) {
+    #serialize(value: unknown) {
         return JSON.stringify(value, (k, v) => typeof v === 'bigint' ? `${v.toString()}n` : v);
     }
 
@@ -53,8 +54,8 @@ class Table<Def extends TableDefinition> implements ITable<Def> {
         });
     }
 
-    #generateKey(tableKey: TableKey<Def>) {
-        const key = this.definition.key.parse(tableKey); // strip other possible properties that do not belong to the key
+    async #generateKey(tableKey: TableKey<Def>) {
+        const key = await validate(this.definition.key, tableKey); // strip other possible properties that do not belong to the key
         return this.#serialize(
             Object.fromEntries(
                 Object.entries(key)
@@ -64,11 +65,11 @@ class Table<Def extends TableDefinition> implements ITable<Def> {
     }
 
     async set(entry: TableEntry<Def>) {
-        await this.client.HSET(this.name, this.#generateKey(entry), this.#serialize(entry));
+        await this.client.HSET(this.name, await this.#generateKey(entry), this.#serialize(entry));
     }
 
     async get(key: TableKey<Def>) {
-        const value = await this.client.HGET(this.name, this.#generateKey(key));
+        const value = await this.client.HGET(this.name, await this.#generateKey(key));
         if(value === null)
             return value;
         return this.#deserialize(value) as TableEntry<Def>;
@@ -89,7 +90,7 @@ class Table<Def extends TableDefinition> implements ITable<Def> {
     }
 
     async remove(key: TableKey<Def>): Promise<void> {
-        await this.client.HDEL(this.name, this.#generateKey(key));
+        await this.client.HDEL(this.name, await this.#generateKey(key));
     }
 }
 
@@ -100,7 +101,7 @@ export default class RedisStore<Definitions extends TableDefinitionMap> implemen
 
     constructor(clientOptions: RedisClientOptions) {
         this.#client = createClient(clientOptions)
-            .on('error', (err: any) => console.error('Redis Client Error', err));
+            .on('error', (err: unknown) => console.error('Redis Client Error', err));
     }
 
     async connect() {
