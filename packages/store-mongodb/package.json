@@ -1,6 +1,6 @@
 {
   "name": "@woltage/store-mongodb",
-  "version": "1.0.3",
+  "version": "1.1.0",
   "description": "MongoDB adapter for Woltage",
   "license": "ISC",
   "author": "wesone",
