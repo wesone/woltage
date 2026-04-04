@@ -9,7 +9,9 @@ A CQRS and Event-Sourcing Framework.
     * [Type](#type)
     * [Version](#version)
     * [Meta Data](#meta-data)
+    * [Schema Evolution](#schema-evolution)
 * [Aggregate](#aggregate)
+    * [Aggregate Options](#aggregate-options)
     * [Aggregate Projector](#aggregate-projector)
     * [Command](#command)
     * [Using Read Models](#using-read-models)
@@ -24,22 +26,26 @@ A CQRS and Event-Sourcing Framework.
 * [Adapter](#adapter)
     * [Event Store](#event-store)
     * [Store](#store)
+    * [Scheduler](#scheduler)
 * [Woltage Instance](#woltage-instance)
 
 ## Get started
 
 Install the `woltage` package:
+
 ```sh
 $ npm i woltage
 ```
 
 Woltage relies on [adapters](#adapter) for handling data. You can build your own adapters that implement the appropriate interfaces ([`IEventStore`](#event-store), [`IStore`](#store), ...) or you can use existing adapters.
 For example:
+
 ```sh
 $ npm i @woltage/eventstore-kurrentdb @woltage/store-redis @woltage/store-mongodb
 ```
 
 Then you can create a [Woltage instance](#woltage-instance):
+
 ```typescript
 import createWoltage from 'woltage';
 import KurrentDBEventStore from '@woltage/eventstore-kurrentdb';
@@ -73,6 +79,7 @@ const woltage = await createWoltage({
 
 You can combine the Woltage instance with an API.
 A basic example with [Express](https://expressjs.com/) could be:
+
 ```typescript
 import createWoltage from 'woltage';
 import express from 'express';
@@ -123,14 +130,16 @@ Property | Type | Description
 [stores?](#store) | `Record<string, {adapter: typeof IStore, args?: any[]}>` | A list of store adapters that can be used for projections. The keys are arbitrary names for the adapters.
 [snapshots?](#snapshots) | [`SnapshotConfig`](#snapshot-config) \| `false` | Set a snapshot config globally for all aggregates. If `false`, snapshots are not used.<br>Default: `false`
 autostart? | `boolean` | Boolean indicating if Woltage should start automatically after creation. Use [`woltage.start()`](#start) to start manually.<br>Default: `true`
-[scheduler?](#scheduler) | `{adapter: typeof IScheduler, args?: any[]}` | If the application needs to schedule commands, a scheduler is needed. If no scheduler is provided, [`woltage.scheduleCommand()`](#schedulecommand) is not available.
+[scheduler?](#scheduler) | `{adapter: typeof IScheduler, args?: any[]}` | If the application needs to schedule commands, a scheduler is needed. If no scheduler is provided, [`woltage.scheduleCommand()`](#schedulecommand) will throw an error.
+[eventCastingFallback?](#remote-casting) | `(event: Event, targetVersion: number, strict?: boolean) => Promise<Event>` | A fallback function for event casting when automatic casting fails due to unknown event versions.
 
 > \* Important:\
-If the directory (or a subdirectory) contains other modules, these modules will be imported too which could lead to side effects.
+If the directory (or a subdirectory) contains other modules, these modules will be imported too, which could lead to side effects.
 
 ## Event
 
-Every change to the state of the application is captured in an event. In Woltage each event has a schema (more precisely a [Zod](https://zod.dev/) schema) that defines how the event's payload looks like. To define an event, extend the Woltage event class:
+Every change to the state of the application is captured in an event. In Woltage, each event has a schema that defines how the event's payload looks like. The schema needs to be [Standard Schema](https://standardschema.dev/) compliant (like [Zod](https://zod.dev/), [Valibot](https://valibot.dev/), [ArkType](https://arktype.io/), ...). To define an event, extend the Woltage event class:
+
 ```typescript
 import {Event, z} from 'woltage';
 
@@ -162,11 +171,12 @@ An event class also has a `version` property. Thus there can be different versio
 
 - The problem: when you change the schema of an existing event class, you probably have historical events inside the event store that were created with the old schema. Your event handlers need to be able to process every possible schema of that event type.
 
-- The solution: with the version property, you will never change that event class and instead create a new event class with the updated schema and set the version property to `2`.
+- The solution: with the version property, you will never change that event class. Instead, create a new event class with the updated schema and set the version property to `2`.
 
 ### Meta Data
 
 An event can also have meta data that you don't want to be part of the payload itself. For example, inside the event's meta data you want to store the user ID of the user that created the event. You could define it this way:
+
 ```typescript
 import {Event, z} from 'woltage';
 
@@ -185,6 +195,7 @@ export default class OrderFulfilled extends Event<typeof schema, TMeta>
     static readonly version = 1;
 }
 ```
+
 ```typescript
 // when producing the event...
 
@@ -203,6 +214,7 @@ const event = new OrderFulfilled({
 ```
 
 If you want to automatically fill in the meta data for every event, you may create a general event class that extends the Woltage event class:
+
 ```typescript
 import {
     Event as WoltageEvent, 
@@ -223,10 +235,12 @@ export default class Event<TPayload extends z.ZodType> extends WoltageEvent<TPay
     }
 }
 ```
+
 > Important:\
 The constructor will also be called for existing serialized events. So you need to differentiate between the creation of a new event and the instantiation of an existing event.
 
 And let every event class extend from that class:
+
 ```typescript
 import {z} from 'woltage';
 import Event from '../Event.ts';
@@ -243,10 +257,74 @@ export default class OrderFulfilled extends Event<typeof schema>
 }
 ```
 
+### Schema Evolution
+
+In a real-world application, you probably need to update your event schemas some day (for adding new features, fixing a typo, ...). You may think, it's easy to just update the schema inside the event class (and update commands and projections accordingly). This works great for new events, but your event store still contains events that were produced before these changes. Their payload will comply with the old schema. The new schema could introduce breaking changes, and that means that your event handlers will throw an error if they expect an event that complies with the latest schema.
+
+Some solutions for this problem:
+- You could build your event handlers so that they can always handle every possible version of an event type. This means you must always maintain legacy event handler code and add migration code to your event handlers, causing your code base to grow exponentially.
+- You could add a dedicated handler for each version of the event type. Again, you would have to keep legacy code; you must not forget to add a new handler for each projection that listens to the event type as soon as you introduce a new version of that type; and the amount of handlers will grow, polluting your projectors.
+- You could always introduce new event types instead of using event versions. This will also result in much more code to be maintained, and existing projections would stop processing if not updated along with the new event type. For example, a projection that just counts the amount of registered users by counting `user.registered` events will stop counting if now only `user.registered.new` events are produced. 
+
+Or you can use the built-in event casting feature. With event casting, you can build your event handlers with your latest features in mind and don't need to handle old payloads. Payloads from older event versions will be upcast to be compatible with the expected version of your handler. On the other hand, existing projections wouldn't need a code update as soon as a new event version was released. Payloads from new events will be downcast to work with the handlers that expect an older version.
+
+For this to work, you need to provide all existing event classes in [config.eventClasses](#config).
+Also, your event schemas need to be fully compatible with each other (forward and backward).
+These rules need to be kept in mind when introducing new event versions:
+
+Operation | downcast possible | upcast possible | both casts possible
+:--- | :--- | :--- | :---
+| Change type                        |        n        |        n        |        n        |
+| Add required field                 |        y        |        n        |        n        |
+| Remove required field              |        n        |        y        |        n        |
+| Add required field with default    |        y        | y (set default) |        y        |
+| Remove required field with default | y (set default) |        y        |        y        |
+| Add optional field                 |        y        |        y        |        y        |
+| Remove optional field              |        y        |        y        |        y        |
+| Add variant (oneof)                |        n        |        y        |        n        |
+| Remove variant (oneof)             |        y        |        n        |        n        |
+| Widen scalar type                  |        n        |        y        |        n        |
+| Narrow scalar type                 |        y        |        n        |        n        |
+| Rename object key                  |        y        |        y        |        y        |
+
+#### Renaming existing keys
+
+You can safely rename a key of a schema without any issues, but you have to provide the name of the key it was renamed from.
+With [Zod](https://zod.dev/), provide a meta field called `renamedFrom`:
+
+```typescript
+const schemaV1 = z.object({
+    // this will be renamed to `prop` in v2
+    p: z.string(),
+    // this optional key was removed in v2
+    prop: z.boolean().optional()
+});
+
+const schemaV2 = z.object({
+    // this is the property `p` from v1
+    prop: z.string().meta({renamedFrom: 'p'}),
+    // this is a completely new property in v2
+    p: z.number().optional()
+});
+```
+
+#### Remote casting
+
+In a distributed system, you may have a service that produces a new version of an existing event type that is currently not known to the consuming service (as this service wasn't updated along with the producing service). In this case, automatic casting would fail, as the consuming service has no idea how the schema of that unknown version looks like.
+
+For this, you can add a custom fallback function in [config.eventCastingFallback](#config). This function will be called whenever the automatic casting does not know the source or target version of an event.
+
+This allows you to (for example) perform a web request to some service that always has the latest collection of events and execute the casting there. Keep in mind that this would massively slow down the processing for affected events, but it's maybe better than letting the consumer crash.
+
+#### Limitations
+
+The automatic casting currently only supports [Zod](https://zod.dev/) schemas.
+
 ## Aggregate
 
 When it comes to producing events, Woltage uses the aggregate pattern.
 An aggregate needs to have a name and an [aggregate projector](#aggregate-projector). After the aggregate was created, you can register [commands](#command) to it. These commands can produce events. An example for an order aggregate:
+
 ```typescript
 import {
     Aggregate, 
@@ -329,6 +407,13 @@ orderAggregate.registerCommand(
 );
 ```
 
+### Aggregate Options
+
+Property | Type | Description
+:--- | :--- | :---
+[snapshots?](#snapshots) | [`SnapshotConfig`](#snapshot-config) \| `false` | Set a snapshot config for this aggregate. The settings take precedence over the global snapshot configuration. If `false`, snapshots are not used, even if a global snapshot config was set.
+[projectorVersion?](#aggregate-projector) | `number` | Set a version for the aggregate projector, to automatically invalidate snapshots that use a previous version.<br>Default: `0`
+
 ### Aggregate Projector
 
 Whenever a [command](#command) is executed, the current state of the requested aggregate stream is calculated and passed to the command. How the state should look is defined by an aggregate projector. It acts like a reducer that reduces all events of the requested aggregate ID to a state.
@@ -340,13 +425,15 @@ $init? | `() => any` | The init function returns an initial state.
 $all? | `(state: any, event: Event) => any` | This function will be called for each event that has no designated event handler and should return the new state.
 [EventClass.identity] | `(state: any, event: Event) => any` | An event handler of a specific event type and version.
 
+When using [snapshots](#snapshots), you can use the [`projectorVersion`](#aggregate-options) option to specify the current version of the aggregate projector. Existing snapshots are invalidated if their projector version does not match with the `projectorVersion` option of the aggregate.
+
 ### Command
 
 A command is the instruction to the system to change an aggregate stream's state. It decides if an event (or events) should be created or not and it will receive the [aggregate's state](#aggregate-projector) to make that decision.
 
-To register a command use the `registerCommand` method of the aggregate.
-- You can pass a [Zod](https://zod.dev/) schema along with the command handler to automatically validate the command payload.
-- The name of the command is simply the name of the function, that you pass as command handler. You can alternatively pass a command name if the command handler is an anonymous function or if you just want to use a different name.
+To register a command, use the `registerCommand` method of the aggregate.
+- You can pass a [Standard Schema](https://standardschema.dev/) compliant schema (e.g. [Zod](https://zod.dev/), [Yup](https://github.com/jquense/yup), [Valibot](https://valibot.dev/), ...) along with the command handler to automatically validate the command payload.
+- The name of the command is simply the name of the function, that you pass as command handler. You can alternatively pass the command name option if the command handler is an anonymous function or if you just want to use a different name.
 - The `registerCommand` method will return an object with the command's info (e.g. the `name`, `schema`, ...)
 
 The command handler has the form:
@@ -361,6 +448,7 @@ To disable optimistic concurrency control, the command handler may return an obj
 ### Using Read Models
 
 In case the state that will be passed to the command handler is not sufficient (maybe the command handler needs to read from a different aggregate stream), you can call read models inside the command handler.
+
 ```typescript
 import {z, ConflictError, DuplicateAggregateError} from 'woltage';
 import userAggregate from './userAggregate.ts';
@@ -396,6 +484,7 @@ userAggregate.registerCommand(
     }
 );
 ```
+
 Use the static `get` method of the read model's class to retrieve the runtime read model instance.
 
 > Important:\
@@ -403,7 +492,7 @@ ReadModelClass.get() only works inside a Woltage context. When you want to use t
 
 ### Snapshots
 
-Every event that belongs to an aggregate stream will be loaded and processed by the [aggregate projector](#aggregate-projector) whenever the state of that aggregate stream is calculated. If the amount of events to read is very high (aggregate is not short-lived) or if the aggregate is frequently accessed, loading and processing all the relevant events everytime could lead to performance issues.
+Every event that belongs to an aggregate stream will be loaded and processed by the [aggregate projector](#aggregate-projector) whenever the state of that aggregate stream is calculated. If the amount of events to read is very high (aggregate is not short-lived) or if the aggregate is frequently accessed, loading and processing all the relevant events every time could lead to performance issues.
 
 Snapshots can help to reduce this workload and allow to read a previously calculated state. Since there are different scenarios where snapshots could come into play, you can set the snapshot behavior [globally](#config) or on a per aggregate basis (which takes precedence over the global settings).
 
@@ -417,7 +506,7 @@ duration? | `number` \| `false` | Create a snapshot as soon as the duration in m
 
 The snapshot strategies (eventCount, duration) can be combined. Whichever happens first, will be used.
 
-The aggregate specific config will be merged with the global config. Set a property to `false` within the aggregate's snapshot config to remove it from the resulting config othwerwise the property of the global config will be used.
+The aggregate-specific config will be merged with the global config. Set a property to `false` within the aggregate's snapshot config to remove it from the resulting config; otherwise, the property from the global config will be used.
 
 Examples:
 Global | Aggegate | Result
@@ -429,17 +518,18 @@ Global | Aggegate | Result
 
 ## Projection
 
-A projection is used to bring the events into a form that is optimized for reading/querying. A projection has a name and a [version](#version-1) and uses a [projector](#projector). As soon as a projection was added, it will start to replay all existing events (the projection is in replay mode while doing this) and then waits for new events. To add a projection use [`woltage.addProjection`](#addprojection).
+A projection is used to bring the events into a form that is optimized for reading/querying. A projection has a name and a [version](#version-1) and uses a [projector](#projector). As soon as a projection was added, it will start to replay all existing events (the projection is in replay mode while doing this), and then waits for new events. To add a projection, use [`woltage.addProjection`](#addprojection).
 
 ### Version
 
-You can add multiple projections with the same name but with different versions. Each projection can use a different projector. When using read models, only the active version of the projection is used by the read model (use [`woltage.setProjectionActive`](#setprojectionactive) to change the active version).
+You can add multiple projections with the same name, but with different versions. Each projection can use a different projector. When using read models, only the active version of the projection is used by the read model (use [`woltage.setProjectionActive`](#setprojectionactive) to change the active version).
 
 Why? To prevent downtimes. It is useful whenever you need to update a projector. This way you can add the new projection with the new projector but still use the old projection while the new one is replaying (which may take some time). As soon as the new projection is up-to-date you can switch to the new projection (and delete the old one). 
 
 ### Projector
 
 A projector is basically a list of event handlers that is used by a projection. The projector operates on a [store](#store):
+
 ```typescript
 import {Projector, z} from 'woltage';
 import UserRegistered from '../events/user/UserRegistered.ts';
@@ -528,7 +618,7 @@ To build your business logic, you may need to execute side effects. For example,
 
 - The problem: when calling the function for sending an email is part of the event handler logic, it will execute also during a replay. Maybe someday you need to change the projection logic and suddenly all of your users will receive confirmation emails even though their accounts are years old.
 
-- The solution: wrap your functions with `sideEffect()` and call that instead. It has the same signature than before, but the side effect will not execute your function during a replay or if called from a projection that is not active.
+- The solution: wrap your functions with `sideEffect()` and call that instead. It has the same signature as before, but the side effect will not execute your function during a replay or if called from a projection that is not active.
 
 ```typescript
 import {Projector, z, sideEffect} from 'woltage';
@@ -577,6 +667,7 @@ export default class UserProjector extends Projector<typeof schema>
 Due to the fact that a side effect is executed conditionally, you can not return any data from a side effect.
 
 If you want to process data returned from a third party API, you would want to put that data in a new event. To create a new event from a side effect, you use the `emit` function (which itself is also a side effect):
+
 ```typescript
 import {sideEffect, emit} from 'woltage';
 import UserConfirmationEmailSent from '../events/user/UserConfirmationEmailSent.ts';
@@ -600,6 +691,8 @@ const sendConfirmationEmail = sideEffect(
 );
 ```
 
+You can use `getProjectionContext` while inside a projection context to retrieve the current context (`isReplaying` flag, the event in `currentEvent` that is currently processing, the current woltage instance in `woltage`).
+
 ## Read Model
 
 A read model is used to read/query the [projections](#projection). It is bound to a projection name and has access to the [store](#store) of the projection's active version (use [`woltage.setProjectionActive`](#setprojectionactive) to change the active version).
@@ -612,7 +705,7 @@ import type UserProjector from '../projectors/UserProjector.ts';
 
 export default class User extends ReadModel<UserProjector>
 {
-    projectionName = 'user';
+    projectionName = 'users';
     schemaRegistry = {
         findOne: z.union([
             z.object({
@@ -629,7 +722,7 @@ export default class User extends ReadModel<UserProjector>
     }
 
     async findOne(query: z.infer<this['schemaRegistry']['findOne']>) {
-        return await this.store.tables.users.findOne(query);
+        return this.store.tables.users.findOne(query);
     }
 }
 ```
@@ -658,7 +751,7 @@ An event store adapter needs to implement the `IEventStore` interface.
 ### Store
 
 You can use many different store technologies inside the same application. So the used database for a projection can depend on the data the projection should handle. For example, a simple projection that is frequently read may use a Redis, while a projection that needs to allow complex querying could use a MongoDB.
-A store adapter needs to implement the `IStore` interface but can have additional functionality.
+A store adapter needs to implement the `IStore` interface, but can have additional functionality.
 
 ### Scheduler
 
@@ -704,7 +797,7 @@ Runs a function within a projection context and returns the function's return va
 
 ### addProjection
 
-`async addProjection(projectionName: string, projectionVersion: number, projectorName: string, projectorVersion: number, storeName: string): Promise<void>`
+`async addProjection(projectionName: string, projectionVersion: number, projectorName: string, projectorVersion: number, storeName: string, forceActivate = false): Promise<Projection>`
 
 To add a new projection. The `storeName` parameter is one of the keys of the config's `stores` property.
 
