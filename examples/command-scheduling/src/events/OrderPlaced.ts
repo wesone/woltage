@@ -2,7 +2,7 @@ import {Event, z} from 'woltage';
 
 const schema = z.object({
     customerId: z.string(),
-    restraurantId: z.string(),
+    restaurantId: z.string(),
     food: z.string(),
     total: z.number()
 });

@@ -28,7 +28,7 @@ export const scheduler: SchedulerAdapterConfig<typeof AMQPScheduler> = Object.fr
     adapter: AMQPScheduler,
     args: [{
         url: process.env.AMQP_URL!,
-        queue: 'scheduled-commands',
+        queuePrefix: 'scheduled-commands',
         exchange: 'scheduled-commands-exchange'
     }]
 });

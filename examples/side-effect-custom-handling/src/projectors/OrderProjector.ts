@@ -30,15 +30,15 @@ export default class OrderProjector extends Projector<typeof schema>
     static readonly version = 1;
 
     async [OrderPlaced.identity](event: OrderPlaced) {
-        const order = await this.store.tables.orders.get({orderId: event.aggregateId});
+        const order = await this.tables.orders.get({orderId: event.aggregateId});
         if(order)
             return;
 
-        await this.store.tables.orders.set({orderId: event.aggregateId, ...event.payload});
+        await this.tables.orders.set({orderId: event.aggregateId, ...event.payload});
         await shipOrder(event);
     }
 
     async [OrderShipped.identity](event: OrderShipped) {
-        await this.store.tables.orders.update({orderId: event.aggregateId}, event.payload);
+        await this.tables.orders.update({orderId: event.aggregateId}, event.payload);
     }
 }

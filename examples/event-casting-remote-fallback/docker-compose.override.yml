@@ -1,0 +1,10 @@
+services:
+  app:
+    extends:
+      file: ../docker-compose.base.yml
+      service: app
+    environment:
+      - CASTER_URL=http://caster:3001
+    working_dir: /usr/src/app/examples/event-casting-remote-fallback/app
+    depends_on:
+      - caster

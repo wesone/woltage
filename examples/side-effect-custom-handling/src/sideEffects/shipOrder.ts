@@ -6,7 +6,7 @@ import OrderAggregate from '../aggregates/order/_Aggregate.ts';
 
 // This simulates a third party API.
 // It will throw an exception for demo purposes.
-const shippingProvider = (() => {
+const getShippingProvider = (() => {
     let simulatedFailures = 0;
     return async () => {
         if(simulatedFailures < 2)
@@ -26,7 +26,7 @@ export default sideEffect(
     async (event: OrderPlaced) => {
         await emit(OrderAggregate.type, new OrderShipped({
             aggregateId: event.aggregateId,
-            payload: await shippingProvider()
+            payload: await getShippingProvider()
         }));
         console.log('Side effect executed successfully for', event.aggregateId);
     }

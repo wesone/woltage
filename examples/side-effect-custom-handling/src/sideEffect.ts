@@ -19,10 +19,6 @@ function getCallerPath()
                 break;
         }
     }
-    // catch(e)
-    // {
-    //     // ignore
-    // }
     finally
     {
         Error.prepareStackTrace = originalPST;
@@ -32,7 +28,7 @@ function getCallerPath()
     }
 }
 
-export default function customSideEffect<TArgs extends any[]>(fn: SideEffectFunction<TArgs>)
+export default function customSideEffect<TArgs extends unknown[]>(fn: SideEffectFunction<TArgs>)
 {
     // The idea is to associate the desired side effect function
     // with an identifier that is consistent between application restarts.

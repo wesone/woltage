@@ -4,7 +4,7 @@ import AccountCredited from '../../events/AccountCredited.ts';
 import AccountDebited from '../../events/AccountDebited.ts';
 
 let eventCount = 0;
-const processedEvent = () => {
+const processEvent = () => {
     eventCount++;
     console.log(`Event count: ${eventCount}`);
 };
@@ -19,7 +19,7 @@ export default Aggregate.create('account', {
         };
     },
     [AccountOpened.identity](state, event: AccountOpened) {
-        processedEvent();
+        processEvent();
         return {
             ...state,
             openedAt: event.timestamp,
@@ -27,12 +27,12 @@ export default Aggregate.create('account', {
         };
     },
     [AccountCredited.identity](state, event: AccountCredited) {
-        processedEvent();
+        processEvent();
         state.balance += event.payload.amount;
         return state;
     },
     [AccountDebited.identity](state, event: AccountDebited) {
-        processedEvent();
+        processEvent();
         state.balance -= event.payload.amount;
         return state;
     }

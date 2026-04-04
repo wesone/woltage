@@ -1,0 +1,15 @@
+include:
+  - ../docker-compose.base.yml
+
+services:
+  caster:
+    image: node:24-alpine
+    ports:
+      - 3001:3001
+    volumes:
+      - ../../:/usr/src/app
+    environment:
+      - NODE_ENV=development
+      - PORT=3001
+    working_dir: /usr/src/app/examples/event-casting-remote-fallback/caster
+    command: "npm start"

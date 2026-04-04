@@ -11,7 +11,7 @@ export default class Order extends ReadModel<OrderProjector>
     };
 
     async findOne(query: z.infer<this['schemaRegistry']['findOne']>) {
-        return await this.store.tables.orders.get(query);
+        return this.tables.orders.get(query);
     }
 }
 

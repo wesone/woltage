@@ -11,7 +11,7 @@ const schema = {
         }),
         schema: z.object({
             customerId: z.string(),
-            restraurantId: z.string(),
+            restaurantId: z.string(),
             food: z.string(),
             total: z.number(),
             status: z.string()
@@ -25,17 +25,17 @@ export default class OrderProjector extends Projector<typeof schema>
     static readonly version = 1;
 
     async [OrderPlaced.identity](event: OrderPlaced) {
-        const order = await this.store.tables.orders.get({orderId: event.aggregateId});
+        const order = await this.tables.orders.get({orderId: event.aggregateId});
         if(order)
             return;
 
-        await this.store.tables.orders.set({
+        await this.tables.orders.set({
             orderId: event.aggregateId,
             ...event.payload,
             status: 'placed'
         });
 
-        // cancel order if not accepted within 1 minute
+        // Cancel order if not accepted within 1 minute
         await this.scheduleCommand(
             new Date(Date.now() + 1000 * 60),
             cancelIfNotAccepted,
@@ -47,12 +47,12 @@ export default class OrderProjector extends Projector<typeof schema>
     }
 
     async [OrderAcceptedByRestaurant.identity](event: OrderAcceptedByRestaurant) {
-        await this.store.tables.orders.update({orderId: event.aggregateId}, {status: 'accepted'});
+        await this.tables.orders.update({orderId: event.aggregateId}, {status: 'accepted'});
         console.log(`Order ${event.aggregateId} was accepted`);
     }
 
     async [OrderCanceled.identity](event: OrderCanceled) {
-        await this.store.tables.orders.update({orderId: event.aggregateId}, {status: 'canceled'});
+        await this.tables.orders.update({orderId: event.aggregateId}, {status: 'canceled'});
         console.log(`Order ${event.aggregateId} was canceled. Reason: ${event.payload.reason}`);
     }
 }

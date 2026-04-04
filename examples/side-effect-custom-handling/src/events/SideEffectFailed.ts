@@ -12,7 +12,7 @@ const schema = z.object({
             type: z.string(),
             version: z.number()
         }),
-        args: z.array(z.any()).optional(),
+        args: z.array(z.unknown()).optional(),
         try: z.number()
     })
 });

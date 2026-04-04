@@ -5,7 +5,7 @@ import SideEffectFailed from './events/SideEffectFailed.ts';
 type SideEffectMessage = {
     origin: string,
     event: Event,
-    args: any[],
+    args: unknown[],
     try: number
 }
 
@@ -15,7 +15,7 @@ class SideEffectHelper
     static #exchangeName = this.#queueName + '_exchange';
     static maxTries = 5;
 
-    static #registeredSideEffects: Record<string, SideEffectFunction<any>> = {};
+    static #registeredSideEffects: Record<string, SideEffectFunction> = {};
     static #senderChannel: amqplib.Channel;
 
     static async init(woltage: Woltage) {
@@ -105,7 +105,7 @@ class SideEffectHelper
         );
     }
 
-    static register<TArgs extends any[]>(origin: string, fn: SideEffectFunction<TArgs>) {
+    static register<TArgs extends unknown[]>(origin: string, fn: SideEffectFunction<TArgs>) {
         if(this.#registeredSideEffects[origin] && this.#registeredSideEffects[origin] !== fn)
             throw new Error(`Ambigious side effect function in '${origin}' detected. Only one side effect function per file is allowed.`);
         this.#registeredSideEffects[origin] = fn;
