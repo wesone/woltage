@@ -167,7 +167,7 @@ export default class Event<TPayload extends PayloadSchema = any, TMeta = any>
             causationId: this.causationId,
             meta: this.meta,
             position: `${this.position}n`
-        };
+        } satisfies SerializedEventData<TPayload, TMeta>;
     }
 
     getDisplayName() {
