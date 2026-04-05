@@ -20,7 +20,7 @@ await SideEffectHelper.init(woltage);
 // Start the application after the side effect helper is ready
 await woltage.start();
 
-// Initialize the example with default data
+// Initialize the example with data
 await initExample(woltage);
 
 // Handle graceful shutdown

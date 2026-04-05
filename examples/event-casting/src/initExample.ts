@@ -9,7 +9,7 @@ import UserCreatedV2 from './events/user/UserCreated2.ts';
 
 export default async (woltage: Woltage) => {
     // We should check if our existing event versions are compatible.
-    // This would normally part of a CI process or an automated test.
+    // This would normally be part of a CI process or an automated test.
     // That way we can make sure that we can always upcast and downcast every event payload to the desired version.
     const upcastErrors = EventCaster.analyze(EventCaster.CASTING_DIRECTIONS.UP, UserCreatedV1.schema, UserCreatedV2.schema);
     const downcastErrors = EventCaster.analyze(EventCaster.CASTING_DIRECTIONS.DOWN, UserCreatedV2.schema, UserCreatedV1.schema);
@@ -34,7 +34,7 @@ export default async (woltage: Woltage) => {
         // We use createLegacy to get some version 1 events into our event store,
         // so we can demonstrate event casting in the projector.
         //
-        // In a real world application:
+        // In a real-world application:
         // We could either still have some user.created@1 producers (third-party services, old commands, ...)
         // or we could have old version 1 events in our event store even though there won't be any new version 1 events.
         //

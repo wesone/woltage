@@ -13,7 +13,7 @@ const woltage = await createWoltage({
         adapter: AMQPScheduler,
         args: [{
             url: 'amqp://localhost',
-            queuePrefix: 'schdeuled',
+            queuePrefix: 'scheduled',
             exchange: 'scheduled-exchange'
         }]
     },

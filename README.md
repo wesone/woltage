@@ -272,7 +272,7 @@ For this to work, you need to provide all existing event classes in [config.even
 Also, your event schemas need to be fully compatible with each other (forward and backward).
 These rules need to be kept in mind when introducing new event versions:
 
-Operation | downcast possible | upcast possible | both casts possible
+Operation | Downcast possible | Upcast possible | Both casts possible
 :--- | :--- | :--- | :---
 | Change type                        |        n        |        n        |        n        |
 | Add required field                 |        y        |        n        |        n        |

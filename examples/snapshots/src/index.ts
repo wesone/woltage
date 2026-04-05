@@ -14,7 +14,7 @@ const woltage = await createWoltage({
     }
 });
 
-// Initialize the example with default data
+// Initialize the example with data
 await initExample(woltage);
 
 // Handle graceful shutdown
