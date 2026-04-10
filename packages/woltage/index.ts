@@ -3,6 +3,7 @@ export {default as BasicError} from './src/errors/BasicError.ts';
 export {default as ConflictError} from './src/errors/ConflictError.ts';
 export {default as DuplicateAggregateError} from './src/errors/DuplicateAggregateError.ts';
 export {default as ForbiddenError} from './src/errors/ForbiddenError.ts';
+export {default as GoneError} from './src/errors/GoneError.ts';
 export {default as NotFoundError} from './src/errors/NotFoundError.ts';
 export {default as UnalteredError} from './src/errors/UnalteredError.ts';
 export {default as UnauthorizedError} from './src/errors/UnauthorizedError.ts';
@@ -34,5 +35,5 @@ export {default as importModules} from './src/utils/importModules.ts';
 export type * from './src/WoltageConfig.ts';
 export {default, type Woltage} from './src/Woltage.ts';
 
-export {default as z} from 'zod';
 export type {StandardSchemaV1} from './src/adapters/standard-schema.ts';
+export {default as z} from 'zod';
