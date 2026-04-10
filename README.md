@@ -141,7 +141,8 @@ If the directory (or a subdirectory) contains other modules, these modules will 
 Every change to the state of the application is captured in an event. In Woltage, each event has a schema that defines how the event's payload looks like. The schema needs to be [Standard Schema](https://standardschema.dev/) compliant (like [Zod](https://zod.dev/), [Valibot](https://valibot.dev/), [ArkType](https://arktype.io/), ...). To define an event, extend the Woltage event class:
 
 ```typescript
-import {Event, z} from 'woltage';
+import {Event} from 'woltage';
+import z from 'zod';
 
 const schema = z.object({
     email: z.email(),
@@ -167,7 +168,7 @@ The class `OrderShipmentPrepared` has the event type `order.shipment.prepared`.
 
 ### Version
 
-An event class also has a `version` property. Thus there can be different versions of the exact same event type. Why? It is used for schema evolution.
+An event class also has a `version` property. Thus there can be different versions of the exact same event type. Why? It is used for [schema evolution](#schema-evolution).
 
 - The problem: when you change the schema of an existing event class, you probably have historical events inside the event store that were created with the old schema. Your event handlers need to be able to process every possible schema of that event type.
 
@@ -178,7 +179,8 @@ An event class also has a `version` property. Thus there can be different versio
 An event can also have meta data that you don't want to be part of the payload itself. For example, inside the event's meta data you want to store the user ID of the user that created the event. You could define it this way:
 
 ```typescript
-import {Event, z} from 'woltage';
+import {Event} from 'woltage';
+import z from 'zod';
 
 type TMeta = {
     userId: string
@@ -218,9 +220,9 @@ If you want to automatically fill in the meta data for every event, you may crea
 ```typescript
 import {
     Event as WoltageEvent, 
-    type EventConstructionData, 
-    type z
+    type EventConstructionData
 } from 'woltage';
+import type z from 'zod';
 
 type TMeta = {
     userId: string
@@ -242,7 +244,7 @@ The constructor will also be called for existing serialized events. So you need 
 And let every event class extend from that class:
 
 ```typescript
-import {z} from 'woltage';
+import z from 'zod';
 import Event from '../Event.ts';
 
 const schema = z.object({
@@ -327,11 +329,11 @@ An aggregate needs to have a name and an [aggregate projector](#aggregate-projec
 
 ```typescript
 import {
-    Aggregate, 
-    z,
+    Aggregate,
     DuplicateAggregateError,
     NotFoundError
 } from 'woltage';
+import z from 'zod';
 import OrderPlaced from './events/OrderPlaced.ts';
 import OrderFulfilled from './events/OrderFulfilled.ts';
 
@@ -450,7 +452,8 @@ To disable optimistic concurrency control, the command handler may return an obj
 In case the state that will be passed to the command handler is not sufficient (maybe the command handler needs to read from a different aggregate stream), you can call read models inside the command handler.
 
 ```typescript
-import {z, ConflictError, DuplicateAggregateError} from 'woltage';
+import {ConflictError, DuplicateAggregateError} from 'woltage';
+import z from 'zod';
 import userAggregate from './userAggregate.ts';
 import {generatePasswordHash} from '../utils/password.ts';
 import User from '../readModels/User.ts';
@@ -531,7 +534,8 @@ Why? To prevent downtimes. It is useful whenever you need to update a projector.
 A projector is basically a list of event handlers that is used by a projection. The projector operates on a [store](#store):
 
 ```typescript
-import {Projector, z} from 'woltage';
+import {Projector} from 'woltage';
+import z from 'zod';
 import UserRegistered from '../events/user/UserRegistered.ts';
 
 const schema = {
@@ -570,7 +574,8 @@ export default class UserProjector extends Projector<typeof schema>
 Woltage allows for Polyglot Persistence. When using TypeScript, you can redeclare the store type and use the adapter specific features along with the methods of the store interface.
 
 ```typescript
-import {Projector, z} from 'woltage';
+import {Projector} from 'woltage';
+import z from 'zod';
 import type MongoDBStore from '@woltage/store-mongodb';
 import UserRegistered from '../events/user/UserRegistered.ts';
 
@@ -618,10 +623,11 @@ To build your business logic, you may need to execute side effects. For example,
 
 - The problem: when calling the function for sending an email is part of the event handler logic, it will execute also during a replay. Maybe someday you need to change the projection logic and suddenly all of your users will receive confirmation emails even though their accounts are years old.
 
-- The solution: wrap your functions with `sideEffect()` and call that instead. It has the same signature as before, but the side effect will not execute your function during a replay or if called from a projection that is not active.
+- The solution: wrap your functions with `sideEffect()` and call that instead. It has the same signature as before (beside that it will always return `Promise<void>`), but the side effect will not execute your function during a replay or if called from a projection that is not active.
 
 ```typescript
-import {Projector, z, sideEffect} from 'woltage';
+import {Projector, sideEffect} from 'woltage';
+import z from 'zod';
 import UserRegistered from '../events/user/UserRegistered.ts';
 import sendMail, {templateConfirmationEmail} from '../mailer.ts';
 
@@ -695,12 +701,13 @@ You can use `getProjectionContext` while inside a projection context to retrieve
 
 ## Read Model
 
-A read model is used to read/query the [projections](#projection). It is bound to a projection name and has access to the [store](#store) of the projection's active version (use [`woltage.setProjectionActive`](#setprojectionactive) to change the active version).
+A read model is used to retrieve the result of a [projection](#projection). It is bound to a projection name and has access to the [store](#store) of the projection's active version (use [`woltage.setProjectionActive`](#setprojectionactive) to change the active version).
 
 > When using TypeScript, you can provide the underlying projector type to have the store's type information.
 
 ```typescript
-import {ReadModel, z} from 'woltage';
+import {ReadModel} from 'woltage';
+import z from 'zod';
 import type UserProjector from '../projectors/UserProjector.ts';
 
 export default class User extends ReadModel<UserProjector>
@@ -718,11 +725,11 @@ export default class User extends ReadModel<UserProjector>
     };
 
     async isEmailAddressAvailable(email: string) {
-        return !(await this.store.tables.emails.get({email}));
+        return !(await this.tables.emails.get({email}));
     }
 
     async findOne(query: z.infer<this['schemaRegistry']['findOne']>) {
-        return this.store.tables.users.findOne(query);
+        return this.tables.users.findOne(query);
     }
 }
 ```
