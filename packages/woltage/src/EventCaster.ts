@@ -64,7 +64,9 @@ export default class EventCaster
         VARIANT_ADDED: 'Variant added',
         VARIANT_REMOVED: 'Variant removed',
         SCALAR_TYPE_WIDENED: 'Widened scalar type',
-        SCALAR_TYPE_NARROWED: 'Narrowed scalar type'
+        SCALAR_TYPE_NARROWED: 'Narrowed scalar type',
+        RENAMED_FROM_UNKNOWN_PROPERTY: 'Property renamed from unknown property',
+        AMBIGUOUS_PROPERTY_NAME: 'Ambiguous property name'
     });
 
     static RECURSION_DEPTH = 20;
@@ -96,8 +98,25 @@ export default class EventCaster
                 for(const [targetKey, targetSchema] of Object.entries<z.ZodType>(tObj))
                 {
                     const renamedFrom = targetSchema.meta()?.renamedFrom;
-                    if(typeof renamedFrom === 'string' && Object.hasOwn(sObj, renamedFrom))
+                    if(typeof renamedFrom === 'string')
                     {
+                        if(!Object.hasOwn(sObj, renamedFrom))
+                        {
+                            this.#pushError(
+                                errors,
+                                [...path, targetKey],
+                                this.CASTING_ERRORS.RENAMED_FROM_UNKNOWN_PROPERTY,
+                                {renamedFrom, targetKey}
+                            );
+                            continue;
+                        }
+                        if(renameFromTo.has(renamedFrom))
+                            this.#pushError(
+                                errors,
+                                [...path, targetKey],
+                                this.CASTING_ERRORS.AMBIGUOUS_PROPERTY_NAME,
+                                {renamedFrom, existingTarget: renameFromTo.get(renamedFrom), conflictingTarget: targetKey}
+                            );
                         renameFromTo.set(renamedFrom, targetKey);
                         renameToFrom.set(targetKey, renamedFrom);
 
@@ -120,8 +139,25 @@ export default class EventCaster
                 for(const [sourceKey, sourceSchema] of Object.entries<z.ZodType>(sObj))
                 {
                     const renamedFrom = sourceSchema.meta()?.renamedFrom;
-                    if(typeof renamedFrom === 'string' && Object.hasOwn(tObj, renamedFrom))
+                    if(typeof renamedFrom === 'string')
                     {
+                        if(!Object.hasOwn(tObj, renamedFrom))
+                        {
+                            this.#pushError(
+                                errors,
+                                [...path, sourceKey],
+                                this.CASTING_ERRORS.RENAMED_FROM_UNKNOWN_PROPERTY,
+                                {renamedFrom, sourceKey}
+                            );
+                            continue;
+                        }
+                        if(renameToFrom.has(renamedFrom))
+                            this.#pushError(
+                                errors,
+                                [...path, sourceKey],
+                                this.CASTING_ERRORS.AMBIGUOUS_PROPERTY_NAME,
+                                {renamedFrom, existingTarget: renameToFrom.get(renamedFrom), conflictingTarget: sourceKey}
+                            );
                         renameFromTo.set(sourceKey, renamedFrom);
                         renameToFrom.set(renamedFrom, sourceKey);
 

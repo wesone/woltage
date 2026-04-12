@@ -203,6 +203,54 @@ await describe('EventCaster', async () => {
                 errors: []
             },
             {
+                name: 'detects renaming from undefined property in UP direction',
+                source: z.object({
+                    p1: z.string()
+                }),
+                target: z.object({
+                    p2: z.string().meta({renamedFrom: 'p3'})
+                }),
+                direction: EventCaster.CASTING_DIRECTIONS.UP,
+                errors: [EventCaster.CASTING_ERRORS.RENAMED_FROM_UNKNOWN_PROPERTY, EventCaster.CASTING_ERRORS.REQUIRED_FIELD_ADDED]
+            },
+            {
+                name: 'detects renaming from undefined property in DOWN direction',
+                source: z.object({
+                    p2: z.string().meta({renamedFrom: 'p3'})
+                }),
+                target: z.object({
+                    p1: z.string()
+                }),
+                direction: EventCaster.CASTING_DIRECTIONS.DOWN,
+                errors: [EventCaster.CASTING_ERRORS.RENAMED_FROM_UNKNOWN_PROPERTY, EventCaster.CASTING_ERRORS.REQUIRED_FIELD_REMOVED]
+            },
+            {
+                name: 'detects ambiguous renaming of properties in UP direction',
+                source: z.object({
+                    p1: z.string(),
+                    p2: z.string()
+                }),
+                target: z.object({
+                    p3: z.string().meta({renamedFrom: 'p1'}),
+                    p4: z.string().meta({renamedFrom: 'p1'})
+                }),
+                direction: EventCaster.CASTING_DIRECTIONS.UP,
+                errors: [EventCaster.CASTING_ERRORS.AMBIGUOUS_PROPERTY_NAME]
+            },
+            {
+                name: 'detects ambiguous renaming of properties in DOWN direction',
+                source: z.object({
+                    p3: z.string().meta({renamedFrom: 'p1'}),
+                    p4: z.string().meta({renamedFrom: 'p1'})
+                }),
+                target: z.object({
+                    p1: z.string(),
+                    p2: z.string()
+                }),
+                direction: EventCaster.CASTING_DIRECTIONS.DOWN,
+                errors: [EventCaster.CASTING_ERRORS.AMBIGUOUS_PROPERTY_NAME]
+            },
+            {
                 name: 'allows compatible schemas (that don\'t require special handling)',
                 source: z.object({name: z.boolean()}),
                 target: z.object({name: z.boolean()}),
