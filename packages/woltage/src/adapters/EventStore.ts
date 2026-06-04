@@ -1,7 +1,6 @@
-import type {Readable} from 'stream';
 import type Event from '../Event.ts';
 
-export interface ReadableStream<T> extends Readable {
+export interface ReadableStream<T> {
     addListener(event: 'data', listener: (data: T) => void): this;
     addListener(event: 'error', listener: (err: Error) => void): this;
     addListener(event: string | symbol, listener: (...args: unknown[]) => void): this;
@@ -21,6 +20,9 @@ export interface ReadableStream<T> extends Readable {
     removeListener(event: 'error', listener: (err: Error) => void): this;
     removeListener(event: string | symbol, listener: (...args: unknown[]) => void): this;
     [Symbol.asyncIterator](): AsyncIterableIterator<T>;
+    pause(): this;
+    resume(): this;
+    destroy(error?: Error): this;
 }
 
 export const START = 'start';
@@ -41,33 +43,41 @@ export type ReadOptions = {
      *
      * Default: `"start"`
      */
-    fromRevision?: ReadRevision,
+    fromRevision?: ReadRevision;
     /**
      * Default: `"forwards"`
      */
-    direction?: Direction
+    direction?: Direction;
 };
 
 export type Filter = {
-    types?: string[]
+    types?: string[];
 };
 
 export type SubscribeOptions = {
     /**
      * Default: `"start"`
      */
-    fromPosition?: ReadRevision,
-    filter?: Filter
+    fromPosition?: ReadRevision;
+    filter?: Filter;
 };
 
 export type SubscriptionStream = ReadableStream<Event>;
 
-export interface IEventStore {
-    connect(): Promise<void>
-    close(force?: boolean): Promise<void>
+export type DeleteOptions = {
+    /**
+     * If the revision is of type BigInt, the revision corresponds to the event index inside the stream.
+     */
+    revision?: bigint | typeof STATE_NEW;
+};
 
-    read(aggregateType: string, aggregateId: string, options?: ReadOptions): AsyncIterableIterator<Event>
-    append(aggregateType: string, aggregateId: string, events: Event[], revision?: AppendRevision): Promise<void>
-    subscribe(options?: SubscribeOptions): SubscriptionStream
-    getLatestPosition(filter?: Filter): Promise<bigint | null>
+export interface IEventStore {
+    connect(): Promise<void>;
+    close(force?: boolean): Promise<void>;
+
+    read(aggregateType: string, aggregateId: string, options?: ReadOptions): AsyncIterableIterator<Event>;
+    append(aggregateType: string, aggregateId: string, events: Event[], revision?: AppendRevision): Promise<void>;
+    subscribe(options?: SubscribeOptions): SubscriptionStream;
+    getLatestPosition(filter?: Filter): Promise<bigint | null>;
+    delete(aggregateType: string, aggregateId: string, options?: DeleteOptions): Promise<void>;
 };

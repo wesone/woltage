@@ -18,7 +18,7 @@
     "prepack": "npm run build"
   },
   "peerDependencies": {
-    "redis": "^5.10.0",
+    "redis": "^5.10.x",
     "woltage": "^1.x"
   },
   "devDependencies": {

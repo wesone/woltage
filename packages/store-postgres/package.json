@@ -18,7 +18,7 @@
     "prepack": "npm run build"
   },
   "peerDependencies": {
-    "pg": "^8.18.0",
+    "pg": "^8.18.x",
     "woltage": "^1.x"
   },
   "devDependencies": {

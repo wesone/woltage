@@ -12,7 +12,8 @@ import {
     type AppendRevision,
     type Filter,
     type ReadOptions,
-    type SubscribeOptions
+    type SubscribeOptions,
+    type DeleteOptions
 } from 'woltage';
 import {
     KurrentDBClient,
@@ -30,7 +31,8 @@ import {
     type Position,
     type ReadStreamOptions,
     type ResolvedEvent,
-    type SubscribeToAllOptions
+    type SubscribeToAllOptions,
+    type TombstoneStreamOptions
 } from '@kurrent/kurrentdb-client';
 import {Transform} from 'stream';
 
@@ -226,5 +228,18 @@ export default class KurrentDBEventStore implements IEventStore
             if(resolvedEvent.event?.position)
                 return resolvedEvent.event.position.commit;
         return null;
+    }
+
+    async delete(aggregateType: string, aggregateId: string, options?: DeleteOptions) {
+        // https://docs.kurrent.io/server/v25.0/features/streams.html#deleting-streams-and-events
+        const opts: TombstoneStreamOptions = {};
+        if(options?.revision !== undefined)
+        {
+            opts.expectedRevision = typeof options.revision === 'string'
+                ? CONSTANTS[options.revision]
+                : options.revision;
+        }
+
+        await this.#client.tombstoneStream(this.#getStreamName(aggregateType, aggregateId), opts);
     }
 }
