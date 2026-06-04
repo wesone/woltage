@@ -15,6 +15,7 @@ import {executionStorage, projectionStorage} from './localStorages.ts';
 import type {WoltageConfig} from './WoltageConfig.ts';
 import CommandScheduler from './write/CommandScheduler.ts';
 import {StandardSchemaV1} from './adapters/standard-schema.ts';
+import PluginRegistry from './plugins/PluginRegistry.ts';
 
 export type AggregateMap = {[aggregateType: string]: Aggregate};
 
@@ -91,6 +92,7 @@ class Woltage
     #getStore;
     #projections;
     #commandScheduler?: CommandScheduler;
+    #pluginRegistry: PluginRegistry;
 
     constructor(config: WoltageConfig) {
         this.config = config;
@@ -103,6 +105,8 @@ class Woltage
         this.#getStore = createStoreFactory(this.config.stores ?? {});
 
         this.#projections = new ProjectionMap();
+
+        this.#pluginRegistry = new PluginRegistry(this.config.plugins);
 
         if(this.config.scheduler)
         {
@@ -127,7 +131,7 @@ class Woltage
         await Promise.all([
             this.#loadModules(
                 this.config.eventClasses,
-                module => module.prototype instanceof Event
+                module => module?.prototype instanceof Event
             )
                 .then(eventClasses => registerEventClasses(eventClasses)),
             this.#loadModules(
@@ -150,12 +154,12 @@ class Woltage
                 )),
             this.#loadModules(
                 this.config.projectorClasses,
-                module => module.prototype instanceof Projector
+                module => module?.prototype instanceof Projector
             )
                 .then(projectorClasses => this.#projectorMap = Woltage.#constructProjectorMap(projectorClasses)),
             this.#loadModules(
                 this.config.readModelClasses,
-                module => module.prototype instanceof ReadModel
+                module => module?.prototype instanceof ReadModel
             )
                 .then(readModelClasses => {
                     this.#readModelMap = Object.fromEntries(
@@ -296,7 +300,8 @@ class Woltage
                 eventStore: this.#eventStore,
                 readModelMap: this.#readModelMap,
                 projectionMap: this.#projections.getActiveProjections(),
-                context
+                context,
+                pluginRegistry: this.#pluginRegistry
             },
             routine
         );
@@ -306,10 +311,10 @@ class Woltage
      * Executes a command.
      * The optional `context` will be passed to the command.
      */
-    async executeCommand<TState, TPayload extends StandardSchemaV1 = any>(commandInfo: CommandInfo<TState, TPayload>, aggregateId: string, payload: unknown, context?: Context): Promise<void>
+    async executeCommand<TState, TPayload extends StandardSchemaV1 | null = StandardSchemaV1 | null>(commandInfo: CommandInfo<TState, TPayload>, aggregateId: string, payload: z.infer<TPayload>, context?: Context): Promise<void>
     async executeCommand(aggregate: Aggregate, aggregateId: string, commandName: string, payload: unknown, context?: Context): Promise<void>
     async executeCommand(aggregateType: string, aggregateId: string, commandName: string, payload: unknown, context?: Context): Promise<void>
-    async executeCommand(aggregateType: string | Aggregate | CommandInfo<unknown>, aggregateId: string, commandName: string, payload: unknown, context?: any) {
+    async executeCommand(aggregateType: string | Aggregate | CommandInfo, aggregateId: string, commandName: string, payload: unknown, context?: any) {
         if(typeof aggregateType !== 'string')
         {
             if('aggregate' in aggregateType) // CommandInfo
@@ -336,10 +341,10 @@ class Woltage
      *
      * For this to work a `scheduler` must be provided via config.
      */
-    async scheduleCommand<TState, TPayload extends StandardSchemaV1 = any>(executeAt: Date, commandInfo: CommandInfo<TState, TPayload>, aggregateId: string, payload: unknown, context?: Context): Promise<void>
+    async scheduleCommand<TState, TPayload extends StandardSchemaV1 | null = StandardSchemaV1 | null>(executeAt: Date, commandInfo: CommandInfo<TState, TPayload>, aggregateId: string, payload: z.infer<TPayload>, context?: Context): Promise<void>
     async scheduleCommand(executeAt: Date, aggregate: Aggregate, aggregateId: string, commandName: string, payload: unknown, context?: Context): Promise<void>
     async scheduleCommand(executeAt: Date, aggregateType: string, aggregateId: string, commandName: string, payload: unknown, context?: Context): Promise<void>
-    async scheduleCommand(executeAt: Date, aggregateType: string | Aggregate | CommandInfo<unknown>, aggregateId: string, commandName: string, payload: unknown, context?: any) {
+    async scheduleCommand(executeAt: Date, aggregateType: string | Aggregate | CommandInfo, aggregateId: string, commandName: string, payload: unknown, context?: any) {
         if(!this.#commandScheduler)
             throw new Error('No scheduler provided. Define a scheduler in the config to use \'scheduleCommand\'.');
 

@@ -1,6 +1,6 @@
 import type {StandardSchemaV1} from '../adapters/standard-schema.ts';
 import NotFoundError from '../errors/NotFoundError.ts';
-import Event from '../Event.ts';
+import type Event from '../Event.ts';
 import type {EventIdentity} from '../Event.ts';
 import {
     STATE_NEW,
@@ -83,11 +83,11 @@ export type CommandOptions = {
     name?: string
 };
 
-export type CommandInfo<TState, TPayload extends StandardSchemaV1 = any> = {
+export type CommandInfo<TState = any, TPayload extends StandardSchemaV1 | null = StandardSchemaV1 | null> = {
     aggregate: Aggregate<TState>,
     name: string,
     schema: TPayload,
-    command: Command<TState, TPayload>,
+    command: Command<TState, TPayload extends StandardSchemaV1 ? TPayload : any>,
     options: CommandOptions
 }
 
@@ -103,7 +103,7 @@ class Aggregate<TState = any>
     projector;
     options;
     #registry;
-    #commands: {[commandName: string]: {schema: StandardSchemaV1, command: Command<TState>, options: CommandOptions}} = {};
+    #commands: {[commandName: string]: CommandInfo<TState>} = {};
     snapshotter;
 
     private constructor(type: string, projector: AggregateProjector<TState>, options: AggregateOptions = {}) {
@@ -138,14 +138,18 @@ class Aggregate<TState = any>
             throw new Error('Command has no name. Provide a named function or options.name to registerCommand.');
         if(this.#commands[name])
             throw new Error(`Command '${name}' already exists in aggregate '${this.type}'.`);
-        this.#commands[name] = {schema, command, options};
-        return {
+
+        const commandInfo = {
             aggregate: this,
             name,
             schema,
             command,
             options
         };
+
+        this.#commands[name] = commandInfo;
+
+        return commandInfo;
     }
 
     async #statusHydrator(status: AggregateStatus<TState>) {
@@ -196,42 +200,130 @@ class Aggregate<TState = any>
         if(!this.#commands[commandName])
             throw new NotFoundError(`Command ${commandName} not found for aggregate ${this.type}.`);
 
-        const {schema, command/* , options */} = this.#commands[commandName];
-        payload = schema
-            ? await validate(schema, payload)
-            : payload;
+        const commandInfo = this.#commands[commandName];
+        const {eventStore, context, pluginRegistry} = readContext(executionStorage);
 
-        const {state, revision, aggregateVersion, postHydrationPromise} = await this.#getStatus(aggregateId);
-        const {eventStore, context} = readContext(executionStorage);
-        const stateUpdate = await command(
-            state,
+        const beforeCommandValidationResult = await pluginRegistry?.run('beforeCommandValidation', {
+            commandInfo,
+            aggregateId,
             payload,
-            Object.freeze({
+            context
+        });
+        if(beforeCommandValidationResult !== undefined)
+            payload = beforeCommandValidationResult;
+
+        try
+        {
+            const {schema} = commandInfo;
+            payload = schema
+                ? await validate(schema, payload)
+                : payload;
+        }
+        catch(error)
+        {
+            if(!pluginRegistry)
+                throw error;
+
+            await pluginRegistry?.handleError('onCommandValidationError', {
+                commandInfo,
+                aggregateId,
+                payload,
+                context,
+                error
+            });
+        }
+
+        try
+        {
+            let {state, revision, aggregateVersion, postHydrationPromise} = await this.#getStatus(aggregateId);
+            let commandContext: CommandContext = {
                 ...(context ?? {}),
                 aggregateId,
                 aggregateVersion
-            })
-        );
+            };
 
-        if(stateUpdate)
-        {
-            const {event, force} = !('event' in stateUpdate)
-                ? {force: false, event: stateUpdate}
-                : stateUpdate;
-
-            const events = !Array.isArray(event) ? [event] : event;
-            events.forEach(event => {
-                event.aggregateId = aggregateId;
-            });
-            await eventStore.append(
-                this.type,
+            const beforeCommandExecutionResult = await pluginRegistry?.run('beforeCommandExecution', {
+                commandInfo,
                 aggregateId,
-                events,
-                force ? undefined : revision
-            );
-        }
+                payload,
+                state,
+                context: commandContext
+            });
+            if(beforeCommandExecutionResult !== undefined)
+            {
+                payload = beforeCommandExecutionResult.payload;
+                state = beforeCommandExecutionResult.state as TState;
+                commandContext = beforeCommandExecutionResult.context;
+            }
 
-        await postHydrationPromise;
+            let stateUpdate;
+            try
+            {
+                stateUpdate = await commandInfo.command(
+                    state,
+                    payload,
+                    commandContext
+                );
+            }
+            catch(error)
+            {
+                if(!pluginRegistry)
+                    throw error;
+
+                await pluginRegistry?.handleError('onCommandExecutionError', {
+                    commandInfo,
+                    aggregateId,
+                    payload,
+                    state,
+                    context: commandContext,
+                    error
+                });
+            }
+
+            const afterCommandExecutionResult = await pluginRegistry?.run('afterCommandExecution', {
+                commandInfo,
+                aggregateId,
+                payload,
+                state,
+                context: commandContext,
+                stateUpdate
+            });
+            if(afterCommandExecutionResult !== undefined)
+                stateUpdate = afterCommandExecutionResult;
+
+            if(stateUpdate)
+            {
+                const {event, force} = !('event' in stateUpdate)
+                    ? {force: false, event: stateUpdate}
+                    : stateUpdate;
+
+                const events = !Array.isArray(event) ? [event] : event;
+                events.forEach(event => {
+                    event.aggregateId = aggregateId;
+                });
+                await eventStore.append(
+                    this.type,
+                    aggregateId,
+                    events,
+                    force ? undefined : revision
+                );
+            }
+
+            await postHydrationPromise;
+        }
+        catch(error)
+        {
+            if(!pluginRegistry)
+                throw error;
+
+            await pluginRegistry?.handleError('onCommandError', {
+                commandInfo,
+                aggregateId,
+                payload,
+                context,
+                error
+            });
+        }
     }
 }
 

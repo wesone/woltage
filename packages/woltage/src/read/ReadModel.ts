@@ -4,6 +4,10 @@ import NotFoundError from '../errors/NotFoundError.ts';
 import validate from '../utils/validate.ts';
 import type {StandardSchemaV1} from '../adapters/standard-schema.ts';
 
+export type ReadModelContext<TContext extends object = Record<string, any>> = TContext & {
+    // Framework specific properties
+};
+
 abstract class ReadModel<TProjector extends Projector<any> = any>
 {
     static getName(className: string) {
@@ -14,6 +18,9 @@ abstract class ReadModel<TProjector extends Projector<any> = any>
         return this.getName(this.name);
     }
 
+    /**
+     * Returns the runtime read model instance when used inside a Woltage context (e.g. inside a command handler).
+     */
     static get<T extends new(...args: any) => ReadModel>(this: T): InstanceType<T> {
         const readModelMap = executionStorage.getStore()?.readModelMap;
         if(!readModelMap)
@@ -56,12 +63,101 @@ abstract class ReadModel<TProjector extends Projector<any> = any>
         const handler = this[handlerName as keyof typeof this];
         if(handler instanceof Function)
         {
+            const {context, pluginRegistry} = executionStorage.getStore() ?? {};
+
             if(handler.name in this.schemaRegistry)
-                query = await this.validate(this.schemaRegistry[handler.name]!, query);
-            const context = Object.freeze({
-                ...(executionStorage.getStore()?.context ?? {})
-            });
-            return handler.bind(this)(query, context);
+            {
+                const beforeReadModelValidationResult = await pluginRegistry?.beforeReadModelValidation({
+                    readModel: this,
+                    handlerName,
+                    query,
+                    context
+                });
+                if(beforeReadModelValidationResult !== undefined)
+                    query = beforeReadModelValidationResult;
+
+                try
+                {
+                    query = await this.validate(this.schemaRegistry[handler.name]!, query);
+                }
+                catch(error)
+                {
+                    if(!pluginRegistry)
+                        throw error;
+
+                    await pluginRegistry?.handleError('onReadModelValidationError', {
+                        readModel: this,
+                        handlerName,
+                        query,
+                        context,
+                        error
+                    });
+                }
+            }
+
+            try
+            {
+                let readModelContext: ReadModelContext = {
+                    ...(context ?? {})
+                    // Framework specific properties
+                };
+
+                const beforeReadModelExecutionResult = await pluginRegistry?.run('beforeReadModelExecution', {
+                    readModel: this,
+                    handlerName,
+                    query,
+                    context: readModelContext
+                });
+                if(beforeReadModelExecutionResult !== undefined)
+                {
+                    query = beforeReadModelExecutionResult.query;
+                    readModelContext = beforeReadModelExecutionResult.context;
+                }
+
+                let result;
+                try
+                {
+                    result = handler.bind(this)(query, readModelContext);
+                }
+                catch(error)
+                {
+                    if(!pluginRegistry)
+                        throw error;
+
+                    await pluginRegistry?.handleError('onReadModelExecutionError', {
+                        readModel: this,
+                        handlerName,
+                        query,
+                        context: readModelContext,
+                        error
+                    });
+                }
+
+                const afterReadModelExecutionResult = await pluginRegistry?.run('afterReadModelExecution', {
+                    readModel: this,
+                    handlerName,
+                    query,
+                    context: readModelContext,
+                    result
+                });
+                if(afterReadModelExecutionResult !== undefined)
+                    result = afterReadModelExecutionResult;
+
+                return result;
+            }
+            catch(error)
+            {
+                if(!pluginRegistry)
+                    throw error;
+
+                await pluginRegistry?.handleError('onReadModelError', {
+                    readModel: this,
+                    handlerName,
+                    query,
+                    context,
+                    error
+                });
+            }
         }
     }
 

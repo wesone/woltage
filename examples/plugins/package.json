@@ -1,0 +1,21 @@
+{
+    "name": "woltage-example-plugins",
+    "version": "1.0.0",
+    "private": true,
+    "type": "module",
+    "main": "src/index.js",
+    "scripts": {
+        "start": "node --watch src/index.ts"
+    },
+    "author": "wesone",
+    "license": "ISC",
+    "dependencies": {
+        "@woltage/eventstore-kurrentdb": "file:../../packages/eventstore-kurrentdb",
+        "@woltage/store-mongodb": "file:../../packages/store-mongodb",
+        "@woltage/store-redis": "file:../../packages/store-redis",
+        "woltage": "file:../../packages/woltage"
+    },
+    "devDependencies": {
+        "typescript": "^5.9.3"
+    }
+}

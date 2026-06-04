@@ -19,6 +19,7 @@ export {default as EventCaster} from './src/EventCaster.ts';
 export type * from './src/write/Aggregate.ts';
 export {default as Aggregate} from './src/write/Aggregate.ts';
 export {default as Projector} from './src/read/Projector.ts';
+export type * from './src/read/ReadModel.ts';
 export {default as ReadModel} from './src/read/ReadModel.ts';
 
 export type * from './src/sideEffects/sideEffect.ts';
@@ -37,3 +38,5 @@ export {default, type Woltage} from './src/Woltage.ts';
 
 export type {StandardSchemaV1} from './src/adapters/standard-schema.ts';
 export {default as z} from 'zod';
+
+export * from './src/plugins/PluginRegistry.ts';

@@ -32,6 +32,16 @@ class Projector<Definitions extends TableDefinitionMap = any>
         this.#registry = new EventRegistry(this, {proto: this.constructor.prototype, eventCastingFallback});
         this.store = store;
         this.store.defineTables(this.constructor.schema as Definitions);
+
+        // Object.keys(this.store.tables)
+        //     .forEach(
+        //         tableName =>
+        //             Object.defineProperty(this, tableName, {
+        //                 get() {
+        //                     return store.tables[tableName];
+        //                 }
+        //             })
+        //     );
     }
 
     get types() {

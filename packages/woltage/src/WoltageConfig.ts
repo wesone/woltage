@@ -7,6 +7,7 @@ import type ReadModel from './read/ReadModel.ts';
 import type Aggregate from './write/Aggregate.ts';
 import type {SnapshotConfig} from './write/Snapshotter.ts';
 import type {EventCastingFallback} from './EventCaster.ts';
+import type {Plugin} from './plugins/PluginRegistry.ts';
 
 export type AdapterConfig<T extends new (...args: any) => unknown = any> = {
     adapter: T,
@@ -20,58 +21,63 @@ export type WoltageConfig = {
     /**
      * An event store adapter.
      */
-    eventStore: EventStoreAdapterConfig,
+    eventStore: EventStoreAdapterConfig;
     /**
      * An array of event classes or a path to a directory to import event classes from.
      *
      * Important: if the directory (or a subdirectory) contains other modules, these modules will be imported too which could lead to side effects.
      */
-    eventClasses: (typeof Event)[] | string,
+    eventClasses: (typeof Event)[] | string;
     /**
      * An array of aggregate instances or a path to a directory to import aggregates from.
      *
      * Important: if the directory (or a subdirectory) contains other modules, these modules will be imported too which could lead to side effects.
      */
-    aggregates: Aggregate[] | string,
+    aggregates: Aggregate[] | string;
     /**
      * An array of projector classes or a path to a directory to import projector classes from.
      *
      * Important: if the directory (or a subdirectory) contains other modules, these modules will be imported too which could lead to side effects.
      */
-    projectorClasses: (typeof Projector)[] | string,
+    projectorClasses: (typeof Projector)[] | string;
     /**
      * An array of read model classes or a path to a directory to import read model classes from.
      *
      * Important: if the directory (or a subdirectory) contains other modules, these modules will be imported too which could lead to side effects.
      */
-    readModelClasses?: (typeof ReadModel)[] | string,
+    readModelClasses?: (typeof ReadModel)[] | string;
     /**
      * A store adapter that is used to store internal data.
      */
-    internalStore: StoreAdapterConfig,
+    internalStore: StoreAdapterConfig;
     /**
      * A list of store adapters that can be used for projections. The keys are arbitrary names for the adapters.
      */
-    stores?: Record<string, StoreAdapterConfig>,
+    stores?: Record<string, StoreAdapterConfig>;
     /**
      * Set a snapshot config globally for all aggregates. If `false`, snapshots are not used.
      *
      * Default: `false`
      */
-    snapshots?: SnapshotConfig | false,
+    snapshots?: SnapshotConfig | false;
     /**
      * Boolean indicating if Woltage should start automatically after creation. Use `woltage.start()` to start manually.
      *
      * Default: `true`
      */
-    autostart?: boolean,
+    autostart?: boolean;
     /**
      * A custom scheduler adapter to use for scheduling commands.
      * Without a scheduler adapter, the scheduling feature is disabled.
      */
-    scheduler?: SchedulerAdapterConfig,
+    scheduler?: SchedulerAdapterConfig;
     /**
-     *
+     * A fallback function to execute whenever the casting of an event fails because of an unknown version.
      */
-    eventCastingFallback?: EventCastingFallback
+    eventCastingFallback?: EventCastingFallback;
+    /**
+     * A list of plugins to register.
+     * Plugins can be used to modify default behavior.
+     */
+    plugins?: Plugin[];
 }

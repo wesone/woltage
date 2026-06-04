@@ -5,6 +5,7 @@ import type Projection from './read/Projection.ts';
 import type ReadModel from './read/ReadModel.ts';
 import type ProjectionMap from './ProjectionMap.ts';
 import type {Context, Woltage} from './Woltage.ts';
+import type PluginRegistry from './plugins/PluginRegistry.ts';
 
 export function readContext<T>(contextStorage: AsyncLocalStorage<T>)
 {
@@ -28,7 +29,8 @@ export type ExecutionContext = {
     eventStore: IEventStore,
     readModelMap: Record<string, ReadModel>,
     projectionMap: ProjectionMap['activeProjections'],
-    context?: Context
+    context?: Context,
+    pluginRegistry?: PluginRegistry
 };
 
 export const executionStorage = new AsyncLocalStorage<ExecutionContext>();
