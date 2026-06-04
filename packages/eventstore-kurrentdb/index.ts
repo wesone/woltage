@@ -154,11 +154,11 @@ export default class KurrentDBEventStore implements IEventStore
                     );
                 }
             }
-            catch(error)
+            catch(e)
             {
-                if(error instanceof StreamNotFoundError)
-                    throw new NotFoundError(error.message);
-                throw error;
+                if(e instanceof StreamNotFoundError)
+                    throw new NotFoundError(e.message);
+                throw e;
             }
         })();
     }
@@ -240,6 +240,17 @@ export default class KurrentDBEventStore implements IEventStore
                 : options.revision;
         }
 
-        await this.#client.tombstoneStream(this.#getStreamName(aggregateType, aggregateId), opts);
+        try
+        {
+            await this.#client.tombstoneStream(this.#getStreamName(aggregateType, aggregateId), opts);
+        }
+        catch(e)
+        {
+            if(e instanceof StreamNotFoundError)
+                throw new NotFoundError(e.message);
+            if(e instanceof WrongExpectedVersionError)
+                throw new ConflictError(`Unexpected state of ${aggregateType} aggregate ${aggregateId}.`);
+            throw e;
+        }
     }
 }
