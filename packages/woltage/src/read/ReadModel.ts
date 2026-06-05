@@ -60,97 +60,34 @@ abstract class ReadModel<TProjector extends Projector<any> = any>
     async call(handlerName: string, query: any) {
         if(!(handlerName in this) || Object.getOwnPropertyNames(ReadModel.prototype).includes(handlerName))
             throw new NotFoundError(`Handler '${handlerName}' of read model '${this.constructor.name}' not found.`);
-        const handler = this[handlerName as keyof typeof this];
-        if(handler instanceof Function)
+
+        const handler = this[handlerName as keyof this];
+        if(!(handler instanceof Function))
+            return;
+
+        const {context, pluginRegistry} = executionStorage.getStore() ?? {};
+
+        if(handlerName in this.schemaRegistry)
         {
-            const {context, pluginRegistry} = executionStorage.getStore() ?? {};
-
-            if(handler.name in this.schemaRegistry)
-            {
-                const beforeReadModelValidationResult = await pluginRegistry?.beforeReadModelValidation({
-                    readModel: this,
-                    handlerName,
-                    query,
-                    context
-                });
-                if(beforeReadModelValidationResult !== undefined)
-                    query = beforeReadModelValidationResult;
-
-                try
-                {
-                    query = await this.validate(this.schemaRegistry[handler.name]!, query);
-                }
-                catch(error)
-                {
-                    if(!pluginRegistry)
-                        throw error;
-
-                    await pluginRegistry?.handleError('onReadModelValidationError', {
-                        readModel: this,
-                        handlerName,
-                        query,
-                        context,
-                        error
-                    });
-                }
-            }
+            const beforeReadModelValidationResult = await pluginRegistry?.beforeReadModelValidation({
+                readModel: this,
+                handlerName,
+                query,
+                context
+            });
+            if(beforeReadModelValidationResult !== undefined)
+                query = beforeReadModelValidationResult;
 
             try
             {
-                let readModelContext: ReadModelContext = {
-                    ...(context ?? {})
-                    // Framework specific properties
-                };
-
-                const beforeReadModelExecutionResult = await pluginRegistry?.run('beforeReadModelExecution', {
-                    readModel: this,
-                    handlerName,
-                    query,
-                    context: readModelContext
-                });
-                if(beforeReadModelExecutionResult !== undefined)
-                {
-                    query = beforeReadModelExecutionResult.query;
-                    readModelContext = beforeReadModelExecutionResult.context;
-                }
-
-                let result;
-                try
-                {
-                    result = handler.bind(this)(query, readModelContext);
-                }
-                catch(error)
-                {
-                    if(!pluginRegistry)
-                        throw error;
-
-                    await pluginRegistry?.handleError('onReadModelExecutionError', {
-                        readModel: this,
-                        handlerName,
-                        query,
-                        context: readModelContext,
-                        error
-                    });
-                }
-
-                const afterReadModelExecutionResult = await pluginRegistry?.run('afterReadModelExecution', {
-                    readModel: this,
-                    handlerName,
-                    query,
-                    context: readModelContext,
-                    result
-                });
-                if(afterReadModelExecutionResult !== undefined)
-                    result = afterReadModelExecutionResult;
-
-                return result;
+                query = await this.validate(this.schemaRegistry[handlerName]!, query);
             }
             catch(error)
             {
                 if(!pluginRegistry)
                     throw error;
 
-                await pluginRegistry?.handleError('onReadModelError', {
+                await pluginRegistry?.handleError('onReadModelValidationError', {
                     readModel: this,
                     handlerName,
                     query,
@@ -158,6 +95,70 @@ abstract class ReadModel<TProjector extends Projector<any> = any>
                     error
                 });
             }
+        }
+
+        try
+        {
+            let readModelContext: ReadModelContext = {
+                ...(context ?? {})
+                // Framework specific properties
+            };
+
+            const beforeReadModelExecutionResult = await pluginRegistry?.run('beforeReadModelExecution', {
+                readModel: this,
+                handlerName,
+                query,
+                context: readModelContext
+            });
+            if(beforeReadModelExecutionResult !== undefined)
+            {
+                query = beforeReadModelExecutionResult.query;
+                readModelContext = beforeReadModelExecutionResult.context;
+            }
+
+            let result;
+            try
+            {
+                result = handler.bind(this)(query, readModelContext);
+            }
+            catch(error)
+            {
+                if(!pluginRegistry)
+                    throw error;
+
+                await pluginRegistry?.handleError('onReadModelExecutionError', {
+                    readModel: this,
+                    handlerName,
+                    query,
+                    context: readModelContext,
+                    error
+                });
+            }
+
+            const afterReadModelExecutionResult = await pluginRegistry?.run('afterReadModelExecution', {
+                readModel: this,
+                handlerName,
+                query,
+                context: readModelContext,
+                result
+            });
+            if(afterReadModelExecutionResult !== undefined)
+                result = afterReadModelExecutionResult;
+
+            return result;
+        }
+        catch(error)
+        {
+            if(!pluginRegistry)
+                throw error;
+
+            await pluginRegistry?.handleError('onReadModelError', {
+                readModel: this,
+                handlerName,
+                query,
+                context,
+                error
+            });
         }
     }
 

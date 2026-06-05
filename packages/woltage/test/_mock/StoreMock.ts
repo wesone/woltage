@@ -1,5 +1,13 @@
 import {type Mock, mock} from 'node:test';
-import type {IStore, ITable, TableDefinition, TableEntry, TableKey, TablePartialEntry, TableDefinitionMap} from '../../src/adapters/Store';
+import type {
+    IStore,
+    ITable,
+    TableDefinition,
+    TableEntry,
+    TableKey,
+    TablePartialEntry,
+    TableDefinitionMap
+} from '../../src/adapters/Store.ts';
 import validate from '../../src/utils/validate.ts';
 
 class TableMock<Def extends TableDefinition> implements ITable<Def> {
