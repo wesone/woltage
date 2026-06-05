@@ -1,4 +1,4 @@
-import ReadModel, {ReadModelContext} from '../read/ReadModel.ts';
+import ReadModel, {type ReadModelContext} from '../read/ReadModel.ts';
 import type {CommandInfo, CommandContext, StateUpdate} from '../write/Aggregate.ts';
 
 type FilterBySuffix<T extends string, Suffix extends string> =
@@ -14,11 +14,23 @@ class PluginBreakError extends Error
     }
 }
 
-type HookDefinition<TData, TResult> = (data: TData) => Promise<TResult | void> | TResult | void;
+type GeneralHookResult = {
+    /**
+     * Indicates whether the execution of subsequent hooks for this event should be stopped.
+     *
+     * Set to `true` to prevent calling registered hooks after this one for the current event.
+     */
+    breakChain?: boolean;
+    /** Return an error to be thrown regardless of the specified `errorStrategy`. */
+    error?: Error;
+};
+
+type HookDefinition<TData, TResult, TReturn = TResult & GeneralHookResult> = (data: TData) =>
+    Promise<TReturn | void> | TReturn | void;
 
 type ErrorHookResult = {
+    /** Set to `true` to swallow the error and prevent throwing. */
     suppress?: boolean;
-    error?: Error;
 };
 
 type ErrorHookDefinition<TData, TResult extends ErrorHookResult = ErrorHookResult> = HookDefinition<TData & {error: Error}, TResult>;
@@ -29,7 +41,6 @@ export type BeforeCommandValidationHook = HookDefinition<{
     payload: unknown;
     context?: Record<string, unknown>;
 }, {
-    error?: Error;
     payload?: unknown;
 }>
 
@@ -47,7 +58,6 @@ export type BeforeCommandExecutionHook = HookDefinition<{
     state: unknown;
     context: CommandContext;
 }, {
-    error?: Error;
     payload?: unknown;
     state?: unknown;
     context?: CommandContext;
@@ -69,7 +79,6 @@ export type AfterCommandExecutionHook = HookDefinition<{
     context: CommandContext;
     stateUpdate: StateUpdate | void;
 }, {
-    error?: Error;
     stateUpdate?: StateUpdate;
 }>
 
@@ -86,49 +95,46 @@ export type BeforeReadModelValidationHook = HookDefinition<{
     query: unknown;
     context?: Record<string, unknown>;
 }, {
-    error?: Error;
     query?: unknown;
 }>
 
-export type OnReadModelValidationErrorHook = ErrorHookDefinition<{
-    readModel: ReadModel;
-    handlerName: string;
+export type OnReadModelValidationErrorHook<R extends ReadModel = ReadModel> = ErrorHookDefinition<{
+    readModel: R;
+    handlerName: keyof R | string;
     query: unknown;
     context?: Record<string, unknown>;
 }>
 
-export type BeforeReadModelExecutionHook = HookDefinition<{
-    readModel: ReadModel;
-    handlerName: string;
+export type BeforeReadModelExecutionHook<R extends ReadModel = ReadModel> = HookDefinition<{
+    readModel: R;
+    handlerName: keyof R | string;
     query: unknown;
     context: ReadModelContext;
 }, {
-    error?: Error;
     query?: unknown;
     context?: CommandContext;
 }>
 
-export type OnReadModelExecutionErrorHook = ErrorHookDefinition<{
-    readModel: ReadModel;
-    handlerName: string;
+export type OnReadModelExecutionErrorHook<R extends ReadModel = ReadModel> = ErrorHookDefinition<{
+    readModel: R;
+    handlerName: keyof R | string;
     query: unknown;
     context: ReadModelContext;
 }>
 
-export type AfterReadModelExecutionHook = HookDefinition<{
-    readModel: ReadModel;
-    handlerName: string;
+export type AfterReadModelExecutionHook<R extends ReadModel = ReadModel> = HookDefinition<{
+    readModel: R;
+    handlerName: keyof R | string;
     query: unknown;
     context: ReadModelContext;
     result: unknown;
 }, {
-    error?: Error;
     result?: unknown;
 }>
 
-export type OnReadModelErrorHook = ErrorHookDefinition<{
-    readModel: ReadModel;
-    handlerName: string;
+export type OnReadModelErrorHook<R extends ReadModel = ReadModel> = ErrorHookDefinition<{
+    readModel: R;
+    handlerName: keyof R | string;
     query: unknown;
     context?: Record<string, unknown>;
 }>
@@ -216,24 +222,26 @@ export interface Plugin {
     };
 }
 
-type Hooks = Required<NonNullable<Plugin['hooks']>>;
-type HookName = keyof Hooks;
+export type Hooks = Required<NonNullable<Plugin['hooks']>>;
+export type HookName = keyof Hooks;
 type ErrorHookName = FilterBySuffix<HookName, 'Error'>;
 
-type HookData<T extends HookDefinition<any, any>> = T extends HookDefinition<infer TData, any>
-    ? TData
-    : never;
-type HookResult<T extends HookDefinition<any, any>> = T extends HookDefinition<any, infer TResult>
-    ? TResult
-    : never;
+export type HookData<
+    T extends HookDefinition<any, any> | HookName,
+    H extends HookDefinition<any, any> = T extends HookName ? Hooks[T] : T
+> = Parameters<H>[0];
+export type HookResult<
+    T extends HookDefinition<any, any> | HookName,
+    H extends HookDefinition<any, any> = T extends HookName ? Hooks[T] : T
+> = ReturnType<H>;
 
 type HookExecutors = {
-    [H in HookName]: (data: HookData<Hooks[H]>) => Promise<unknown>;
+    [T in HookName]: (data: HookData<T>) => Promise<unknown>;
 };
 
 export class PluginRegistry implements HookExecutors
 {
-    #hooks: Record<HookName, {plugin: Plugin; hook: NonNullable<any>}[]> = {
+    #hooks: {[T in HookName]: {plugin: Plugin; hook: NonNullable<Hooks[T]>}[]} = {
         beforeCommandValidation: [],
         onCommandValidationError: [],
         beforeCommandExecution: [],
@@ -249,11 +257,15 @@ export class PluginRegistry implements HookExecutors
     };
 
     constructor(plugins: Plugin[] = []) {
+        this.#registerHooks(plugins);
+    }
+
+    #registerHooks<T extends HookName>(plugins: Plugin[]) {
         const handles = new Set<string>();
         for(const plugin of plugins)
         {
-            if(!plugin.handle?.length)
-                throw new Error('Plugin handle must be provided and non-empty.');
+            if(typeof plugin.handle !== 'string' || !plugin.handle.length)
+                throw new Error('Plugin handle must be a non-empty string.');
             if(handles.has(plugin.handle))
                 throw new Error(`Plugin handle '${plugin.handle}' is duplicated.`);
             handles.add(plugin.handle);
@@ -261,9 +273,9 @@ export class PluginRegistry implements HookExecutors
 
         for(const plugin of plugins)
         {
-            for(const hookName of Object.keys(this.#hooks) as HookName[])
+            for(const hookName of Object.keys(this.#hooks) as T[])
             {
-                const hook = plugin.hooks?.[hookName];
+                const hook = plugin.hooks?.[hookName] as Hooks[T] | undefined;
                 if(hook)
                     this.#hooks[hookName].push({plugin, hook});
             }
@@ -280,16 +292,18 @@ export class PluginRegistry implements HookExecutors
 
     async #callHooks<T extends HookName>(
         hookName: T,
-        data: HookData<Hooks[T]>,
-        processor: (hookResult: HookResult<Hooks[T]>, plugin: Plugin) => Promise<boolean>
+        data: HookData<T>,
+        processor: (hookResult: Awaited<HookResult<T>>, plugin: Plugin) => Promise<void>
     ): Promise<void> {
-        for(const entry of this.#hooks[hookName])
+        for(const {plugin, hook} of this.#hooks[hookName])
         {
-            const {plugin, hook} = entry;
             try
             {
-                const shouldContinue = await processor(await hook(data), plugin);
-                if(!shouldContinue)
+                const result = await (hook(data as any) as HookResult<T>);
+                await processor(result, plugin);
+                if(result?.error !== undefined)
+                    throw new PluginBreakError(result.error);
+                if(result?.breakChain)
                     break;
             }
             catch(error)
@@ -308,24 +322,24 @@ export class PluginRegistry implements HookExecutors
         }
     }
 
-    async run<T extends HookName>(hookName: T, data: HookData<Hooks[T]>) {
+    async run<T extends HookName>(hookName: T, data: HookData<T>) {
         return await this[hookName]?.(data as any) as ReturnType<this[T]>;
     }
 
-    async handleError<T extends ErrorHookName>(hookName: T, data: Omit<HookData<Hooks[T]>, 'error'> & {error: unknown}) {
+    async handleError<T extends ErrorHookName>(hookName: T, data: Omit<HookData<T>, 'error'> & {error: unknown}) {
         if(data.error instanceof Error)
         {
-            const errorHookResult = await this.run(hookName, data as HookData<Hooks[T]>);
-            if(errorHookResult?.suppress)
+            const errorHookResult = await this.run(hookName, data as HookData<T>);
+            if(errorHookResult.suppress)
                 return;
 
-            throw errorHookResult?.error ?? data.error;
+            throw errorHookResult.error;
         }
 
         throw data.error;
     }
 
-    async errorHookExecutor<T extends ErrorHookName>(hookName: T, data: HookData<Hooks[T]>) {
+    async errorHookExecutor<T extends ErrorHookName>(hookName: T, data: HookData<T>) {
         let shouldSuppress = false;
         let error = data.error;
 
@@ -340,7 +354,6 @@ export class PluginRegistry implements HookExecutors
                 if(result.suppress !== undefined)
                     shouldSuppress = result.suppress;
             }
-            return true;
         });
 
         return {error, suppress: shouldSuppress};
@@ -357,10 +370,7 @@ export class PluginRegistry implements HookExecutors
                     payload = result.payload;
                     data.payload = payload;
                 }
-                if(result.error !== undefined)
-                    throw new PluginBreakError(result.error);
             }
-            return true;
         });
 
         return payload;
@@ -388,10 +398,7 @@ export class PluginRegistry implements HookExecutors
                         data[key] = returnValue[key] as any;
                     }
                 });
-                if(result.error !== undefined)
-                    throw new PluginBreakError(result.error);
             }
-            return true;
         });
 
         return returnValue;
@@ -412,10 +419,7 @@ export class PluginRegistry implements HookExecutors
                     stateUpdate = result.stateUpdate;
                     data.stateUpdate = stateUpdate;
                 }
-                if(result.error !== undefined)
-                    throw new PluginBreakError(result.error);
             }
-            return true;
         });
 
         return stateUpdate;
@@ -436,10 +440,7 @@ export class PluginRegistry implements HookExecutors
                     query = result.query;
                     data.query = query;
                 }
-                if(result.error !== undefined)
-                    throw new PluginBreakError(result.error);
             }
-            return true;
         });
 
         return query;
@@ -466,10 +467,7 @@ export class PluginRegistry implements HookExecutors
                         data[key] = returnValue[key] as any;
                     }
                 });
-                if(result.error !== undefined)
-                    throw new PluginBreakError(result.error);
             }
-            return true;
         });
 
         return returnValue;
@@ -490,10 +488,7 @@ export class PluginRegistry implements HookExecutors
                     result = res.result;
                     data.result = result;
                 }
-                if(res.error !== undefined)
-                    throw new PluginBreakError(res.error);
             }
-            return true;
         });
 
         return result;
