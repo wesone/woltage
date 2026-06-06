@@ -42,6 +42,7 @@ export type BeforeCommandValidationHook = HookDefinition<{
     context?: Record<string, unknown>;
 }, {
     payload?: unknown;
+    skip?: boolean;
 }>
 
 export type OnCommandValidationErrorHook = ErrorHookDefinition<{
@@ -96,6 +97,7 @@ export type BeforeReadModelValidationHook = HookDefinition<{
     context?: Record<string, unknown>;
 }, {
     query?: unknown;
+    skip?: boolean;
 }>
 
 export type OnReadModelValidationErrorHook<R extends ReadModel = ReadModel> = ErrorHookDefinition<{
@@ -112,7 +114,7 @@ export type BeforeReadModelExecutionHook<R extends ReadModel = ReadModel> = Hook
     context: ReadModelContext;
 }, {
     query?: unknown;
-    context?: CommandContext;
+    context?: ReadModelContext;
 }>
 
 export type OnReadModelExecutionErrorHook<R extends ReadModel = ReadModel> = ErrorHookDefinition<{
@@ -360,20 +362,25 @@ export class PluginRegistry implements HookExecutors
     }
 
     async beforeCommandValidation(data: HookData<BeforeCommandValidationHook>) {
-        let payload = data.payload;
+        const returnValue = {
+            payload: data.payload,
+            skip: false
+        };
 
         await this.#callHooks('beforeCommandValidation', data, async result => {
             if(result)
             {
                 if(result.payload !== undefined)
                 {
-                    payload = result.payload;
-                    data.payload = payload;
+                    returnValue.payload = result.payload;
+                    data.payload = returnValue.payload;
                 }
+                if(result.skip !== undefined)
+                    returnValue.skip = result.skip;
             }
         });
 
-        return payload;
+        return returnValue;
     }
 
     async onCommandValidationError(data: HookData<OnCommandValidationErrorHook>) {
@@ -430,20 +437,25 @@ export class PluginRegistry implements HookExecutors
     }
 
     async beforeReadModelValidation(data: HookData<BeforeReadModelValidationHook>) {
-        let query = data.query;
+        const returnValue = {
+            query: data.query,
+            skip: false
+        };
 
         await this.#callHooks('beforeReadModelValidation', data, async result => {
             if(result)
             {
                 if(result.query !== undefined)
                 {
-                    query = result.query;
-                    data.query = query;
+                    returnValue.query = result.query;
+                    data.query = returnValue.query;
                 }
+                if(result.skip !== undefined)
+                    returnValue.skip = result.skip;
             }
         });
 
-        return query;
+        return returnValue;
     }
 
     async onReadModelValidationError(data: HookData<OnReadModelValidationErrorHook>) {

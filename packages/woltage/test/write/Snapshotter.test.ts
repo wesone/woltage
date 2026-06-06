@@ -104,7 +104,7 @@ await describe('Snapshotter', async () => {
         const snapshotter = new Snapshotter('test');
         const storeMock = new StoreMock<typeof snapshotSchema>();
 
-        await assert.doesNotReject(() => snapshotter.set(snapshot));
+        await assert.doesNotReject(snapshotter.set(snapshot));
 
         await snapshotter.setStore(storeMock);
         await snapshotter.set(snapshot);
@@ -126,13 +126,13 @@ await describe('Snapshotter', async () => {
     await it('remove - removes snapshot if exists', async () => {
         const snapshotter = new Snapshotter('test');
         const storeMock = new StoreMock();
-        await assert.doesNotReject(() => snapshotter.remove(snapshot.aggregateId));
+        await assert.doesNotReject(snapshotter.remove(snapshot.aggregateId));
 
         await snapshotter.setStore(storeMock);
         await snapshotter.set(snapshot);
         assert.strictEqual(await snapshotter.get(snapshot.aggregateId), snapshot);
 
-        await assert.doesNotReject(() => snapshotter.remove(snapshot.aggregateId));
+        await assert.doesNotReject(snapshotter.remove(snapshot.aggregateId));
         assert.strictEqual(await snapshotter.get(snapshot.aggregateId), null);
     });
 

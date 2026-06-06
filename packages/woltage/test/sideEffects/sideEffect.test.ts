@@ -5,6 +5,7 @@ import sideEffect from '../../src/sideEffects/sideEffect.ts';
 import mockEventClass from '../_mock/mockEventClass.ts';
 import mockProjectionContext from '../_mock/mockProjectionContext.ts';
 import type Projection from '../../src/read/Projection.ts';
+import mockConsole from '../_mock/mockConsole.ts';
 
 await describe('sideEffect', async () => {
     const TestEvent = mockEventClass('test');
@@ -16,8 +17,11 @@ await describe('sideEffect', async () => {
     await it('prevents execution if there is no event context', async () => {
         const actualSideEffect = mock.fn();
         const testSideEffect = sideEffect(actualSideEffect);
-        testSideEffect(null);
+        const {consoleCalls, resetConsoleMock} = mockConsole('trace');
+        await testSideEffect(null);
+        resetConsoleMock();
         assert.strictEqual(actualSideEffect.mock.callCount(), 0);
+        assert.strictEqual(consoleCalls.length, 1, 'Did not warn the user (`console.trace`).');
     });
 
     await it('prevents execution if system is replaying', async () => {
@@ -25,7 +29,7 @@ await describe('sideEffect', async () => {
         const testSideEffect = sideEffect(actualSideEffect);
 
         mockProjectionContext({isReplaying: true, currentEvent});
-        testSideEffect(null);
+        await testSideEffect(null);
 
         assert.strictEqual(actualSideEffect.mock.callCount(), 0);
     });
@@ -39,7 +43,7 @@ await describe('sideEffect', async () => {
             currentEvent,
             projection: {isActive: false} as unknown as Projection
         });
-        testSideEffect(null);
+        await testSideEffect(null);
 
         assert.strictEqual(actualSideEffect.mock.callCount(), 0);
     });
@@ -49,7 +53,7 @@ await describe('sideEffect', async () => {
         const testSideEffect = sideEffect(actualSideEffect);
 
         mockProjectionContext({isReplaying: false, currentEvent});
-        testSideEffect(null);
+        await testSideEffect(null);
 
         assert.strictEqual(actualSideEffect.mock.callCount(), 1);
     });
@@ -63,7 +67,7 @@ await describe('sideEffect', async () => {
             currentEvent,
             projection: {isActive: true} as unknown as Projection
         });
-        testSideEffect(null);
+        await testSideEffect(null);
 
         assert.strictEqual(actualSideEffect.mock.callCount(), 1);
     });

@@ -1,86 +1,57 @@
 import {describe, it, mock} from 'node:test';
 import assert from 'node:assert/strict';
 
-import PluginRegistry, {type Hooks, type HookData, type HookName, type Plugin} from '../../src/plugins/PluginRegistry.ts';
+import PluginRegistry, {type HookData, type HookName} from '../../src/plugins/PluginRegistry.ts';
+import mockPlugin, {mockPluginRegistry} from '../_mock/mockPlugin.ts';
 import mockEventClass from '../_mock/mockEventClass.ts';
 import {mockReadModel} from '../_mock/ReadModelMock.ts';
 import mockConsole from '../_mock/mockConsole.ts';
 
-function createPlugin(overrides: Partial<Plugin> = {})
-{
-    return {
-        handle: 'plugin-' + Math.random().toString(16).slice(2),
-        name: 'TestPlugin',
-        errorStrategy: 'ignore',
-        hooks: {},
-        ...overrides
-    } satisfies Plugin;
-}
-
-function createPluginRegistry(hooks: Partial<Hooks>, overrides: Partial<Omit<Plugin, 'hooks'>> = {})
-{
-    return new PluginRegistry([
-        createPlugin({
-            ...overrides,
-            hooks
-        })
-    ]);
-}
-
 await describe('PluginRegistry', async () => {
-    const expectedError = new Error('Break');
+    const forcedError = new Error('Break');
     const testGenerals = async <T extends HookName>(hookName: T, data: HookData<T>) => {
         await it('can force throw an error by providing an `error`', async () => {
-            const registry = createPluginRegistry({
+            const registry = mockPluginRegistry({
                 [hookName]: () => ({
-                    error: expectedError
+                    error: forcedError
                 })
             }, {errorStrategy: 'ignore'});
 
             await assert.rejects(
                 registry[hookName](data as any),
-                expectedError
+                forcedError
             );
         });
 
         await it('can stop calling subsequent plugins by providing `breakChain: true`', async () => {
-            const registry = new PluginRegistry([
-                createPlugin({
-                    hooks: {
-                        [hookName]: () => ({})
-                    }
-                }),
-                createPlugin({
-                    hooks: {
-                        [hookName]: () => ({
-                            error: expectedError
-                        })
-                    }
-                })
+            const registry = mockPluginRegistry([
+                {
+                    [hookName]: () => ({})
+                },
+                {
+                    [hookName]: () => ({
+                        error: forcedError
+                    })
+                }
+            ]);
+
+            const registry2 = mockPluginRegistry([
+                {
+                    [hookName]: () => ({
+                        breakChain: true
+                    })
+                },
+                {
+                    [hookName]: () => ({
+                        error: forcedError
+                    })
+                }
             ]);
 
             await assert.rejects(
                 registry[hookName](data as any),
-                expectedError
+                forcedError
             );
-
-            const registry2 = new PluginRegistry([
-                createPlugin({
-                    hooks: {
-                        [hookName]: () => ({
-                            breakChain: true
-                        })
-                    }
-                }),
-                createPlugin({
-                    hooks: {
-                        [hookName]: () => ({
-                            error: expectedError
-                        })
-                    }
-                })
-            ]);
-
             await assert.doesNotReject(registry2[hookName](data as any));
         });
     };
@@ -90,7 +61,7 @@ await describe('PluginRegistry', async () => {
             {
                 handle: 'plugin-1'
             },
-            createPlugin({
+            mockPlugin({
                 handle: 'plugin-2',
                 hooks: {
                     beforeCommandValidation: () => ({
@@ -126,7 +97,7 @@ await describe('PluginRegistry', async () => {
 
         it('registers hooks', () => {
             const registry = new PluginRegistry([
-                createPlugin({
+                mockPlugin({
                     hooks: {
                         beforeCommandValidation: () => ({
                             payload: {injected: true}
@@ -136,7 +107,7 @@ await describe('PluginRegistry', async () => {
                         })
                     }
                 }),
-                createPlugin({
+                mockPlugin({
                     hooks: {
                         onCommandValidationError: () => ({
                             suppress: true
@@ -157,22 +128,52 @@ await describe('PluginRegistry', async () => {
         const data = {
             commandInfo: {} as any,
             aggregateId: 'a',
-            payload: {p: 1}
+            payload: Object.freeze({p: 1})
         };
 
         await it('can transform payload', async () => {
-            const registry = createPluginRegistry({
-                [hookName]: data => ({
-                    payload: {
-                        ...(data.payload as any),
-                        changed: true
-                    }
-                })
-            });
+            const registry = mockPluginRegistry([
+                {
+                    [hookName]: data => ({
+                        payload: {
+                            ...(data.payload as any),
+                            change1: true
+                        }
+                    })
+                },
+                {
+                    [hookName]: data => ({
+                        payload: {
+                            ...(data.payload as any),
+                            change2: true
+                        }
+                    })
+                }
+            ]);
 
-            const result = await registry[hookName](data);
+            const result = await registry[hookName]({...data});
 
-            assert.deepStrictEqual(result, {p: 1, changed: true});
+            assert.deepStrictEqual(
+                result,
+                {skip: false, payload: {p: 1, change1: true, change2: true}}
+            );
+        });
+
+        await it('can skip validation', async () => {
+            const registry = mockPluginRegistry([
+                {
+                    [hookName]: () => ({
+                        skip: true
+                    })
+                },
+                {
+                    [hookName]: () => {}
+                }
+            ]);
+
+            const result = await registry[hookName]({...data});
+
+            assert.deepStrictEqual(result, {skip: true, payload: {p: 1}});
         });
 
         await testGenerals(hookName, data);
@@ -189,7 +190,7 @@ await describe('PluginRegistry', async () => {
         };
 
         await it('can suppress errors', async () => {
-            const registry = createPluginRegistry({
+            const registry = mockPluginRegistry({
                 [hookName]: () => ({suppress: true})
             });
 
@@ -197,7 +198,7 @@ await describe('PluginRegistry', async () => {
         });
 
         await it('throws original error', async () => {
-            const registry = createPluginRegistry({
+            const registry = mockPluginRegistry({
                 [hookName]: () => ({suppress: false})
             });
 
@@ -206,7 +207,7 @@ await describe('PluginRegistry', async () => {
                 originalError
             );
 
-            const registry2 = createPluginRegistry({
+            const registry2 = mockPluginRegistry({
                 [hookName]: () => {}
             });
 
@@ -230,28 +231,38 @@ await describe('PluginRegistry', async () => {
         };
 
         await it('can transform values', async () => {
-            const registry = createPluginRegistry({
-                [hookName]: data => ({
-                    payload: {
-                        ...(data.payload as any),
-                        changed: true
-                    },
-                    state: {
-                        ...(data.state as any),
-                        changed: true
-                    },
-                    context:{
-                        ...(data.context as any),
-                        changed: true
-                    }
-                })
-            });
+            const registry = mockPluginRegistry([
+                {
+                    [hookName]: data => ({
+                        payload: {
+                            ...(data.payload as any),
+                            changed: true
+                        },
+                        state: {
+                            ...(data.state as any),
+                            change1: true
+                        }
+                    })
+                },
+                {
+                    [hookName]: data => ({
+                        state: {
+                            ...(data.state as any),
+                            change2: true
+                        },
+                        context:{
+                            ...(data.context as any),
+                            changed: true
+                        }
+                    })
+                }
+            ]);
 
             const result = await registry[hookName](data);
 
             assert.deepStrictEqual(result, {
                 payload: {p: 1, changed: true},
-                state: {s: 1, changed: true},
+                state: {s: 1, change1: true, change2: true},
                 context: {aggregateId: 'a1', aggregateVersion: 42, changed: true}
             });
         });
@@ -272,7 +283,7 @@ await describe('PluginRegistry', async () => {
         };
 
         await it('can suppress errors', async () => {
-            const registry = createPluginRegistry({
+            const registry = mockPluginRegistry({
                 [hookName]: () => ({suppress: true})
             });
 
@@ -280,7 +291,7 @@ await describe('PluginRegistry', async () => {
         });
 
         await it('throws original error', async () => {
-            const registry = createPluginRegistry({
+            const registry = mockPluginRegistry({
                 [hookName]: () => ({suppress: false})
             });
 
@@ -289,7 +300,7 @@ await describe('PluginRegistry', async () => {
                 originalError
             );
 
-            const registry2 = createPluginRegistry({
+            const registry2 = mockPluginRegistry({
                 [hookName]: () => {}
             });
 
@@ -314,11 +325,16 @@ await describe('PluginRegistry', async () => {
         };
 
         await it('can transform stateUpdate', async () => {
-            const registry = createPluginRegistry({
-                [hookName]: () => ({
-                    stateUpdate: []
-                })
-            });
+            const registry = mockPluginRegistry([
+                {
+                    [hookName]: () => {}
+                },
+                {
+                    [hookName]: () => ({
+                        stateUpdate: []
+                    })
+                }
+            ]);
 
             const result = await registry[hookName](data);
 
@@ -339,7 +355,7 @@ await describe('PluginRegistry', async () => {
         };
 
         await it('can suppress errors', async () => {
-            const registry = createPluginRegistry({
+            const registry = mockPluginRegistry({
                 [hookName]: () => ({suppress: true})
             });
 
@@ -347,7 +363,7 @@ await describe('PluginRegistry', async () => {
         });
 
         await it('throws original error', async () => {
-            const registry = createPluginRegistry({
+            const registry = mockPluginRegistry({
                 [hookName]: () => ({suppress: false})
             });
 
@@ -356,7 +372,7 @@ await describe('PluginRegistry', async () => {
                 originalError
             );
 
-            const registry2 = createPluginRegistry({
+            const registry2 = mockPluginRegistry({
                 [hookName]: () => {}
             });
 
@@ -378,18 +394,45 @@ await describe('PluginRegistry', async () => {
         };
 
         await it('can transform query', async () => {
-            const registry = createPluginRegistry({
-                [hookName]: data => ({
-                    query: {
-                        ...(data.query as any),
-                        changed: true
-                    }
-                })
-            });
+            const registry = mockPluginRegistry([
+                {
+                    [hookName]: data => ({
+                        query: {
+                            ...(data.query as any),
+                            change1: true
+                        }
+                    })
+                },
+                {
+                    [hookName]: data => ({
+                        query: {
+                            ...(data.query as any),
+                            change2: true
+                        }
+                    })
+                }
+            ]);
 
-            const result = await registry[hookName](data);
+            const result = await registry[hookName]({...data});
 
-            assert.deepStrictEqual(result, {q: 1, changed: true});
+            assert.deepStrictEqual(result, {skip: false, query: {q: 1, change1: true, change2: true}});
+        });
+
+        await it('can skip validation', async () => {
+            const registry = mockPluginRegistry([
+                {
+                    [hookName]: () => ({
+                        skip: true
+                    })
+                },
+                {
+                    [hookName]: () => {}
+                }
+            ]);
+
+            const result = await registry[hookName]({...data});
+
+            assert.deepStrictEqual(result, {skip: true, query: {q: 1}});
         });
 
         await testGenerals(hookName, data);
@@ -406,7 +449,7 @@ await describe('PluginRegistry', async () => {
         };
 
         await it('can suppress errors', async () => {
-            const registry = createPluginRegistry({
+            const registry = mockPluginRegistry({
                 [hookName]: () => ({suppress: true})
             });
 
@@ -414,7 +457,7 @@ await describe('PluginRegistry', async () => {
         });
 
         await it('throws original error', async () => {
-            const registry = createPluginRegistry({
+            const registry = mockPluginRegistry({
                 [hookName]: () => ({suppress: false})
             });
 
@@ -423,7 +466,7 @@ await describe('PluginRegistry', async () => {
                 originalError
             );
 
-            const registry2 = createPluginRegistry({
+            const registry2 = mockPluginRegistry({
                 [hookName]: () => {}
             });
 
@@ -446,18 +489,24 @@ await describe('PluginRegistry', async () => {
         };
 
         await it('can transform values', async () => {
-            const registry = createPluginRegistry({
-                [hookName]: data => ({
-                    query: {
-                        ...(data.query as any),
-                        changed: true
-                    },
-                    context: {
-                        ...(data.context as any),
-                        changed: true
-                    }
-                })
-            });
+            const registry = mockPluginRegistry([
+                {
+                    [hookName]: data => ({
+                        query: {
+                            ...(data.query as any),
+                            changed: true
+                        }
+                    })
+                },
+                {
+                    [hookName]: data => ({
+                        context: {
+                            ...(data.context as any),
+                            changed: true
+                        }
+                    })
+                }
+            ]);
 
             const result = await registry[hookName](data);
 
@@ -482,7 +531,7 @@ await describe('PluginRegistry', async () => {
         };
 
         await it('can suppress errors', async () => {
-            const registry = createPluginRegistry({
+            const registry = mockPluginRegistry({
                 [hookName]: () => ({suppress: true})
             });
 
@@ -490,7 +539,7 @@ await describe('PluginRegistry', async () => {
         });
 
         await it('throws original error', async () => {
-            const registry = createPluginRegistry({
+            const registry = mockPluginRegistry({
                 [hookName]: () => ({suppress: false})
             });
 
@@ -499,7 +548,7 @@ await describe('PluginRegistry', async () => {
                 originalError
             );
 
-            const registry2 = createPluginRegistry({
+            const registry2 = mockPluginRegistry({
                 [hookName]: () => {}
             });
 
@@ -523,15 +572,22 @@ await describe('PluginRegistry', async () => {
         };
 
         await it('can transform handler\'s return value', async () => {
-            const registry = createPluginRegistry({
-                [hookName]: () => ({
-                    result: {manipulated: true}
-                })
-            });
+            const registry = mockPluginRegistry([
+                {
+                    [hookName]: () => ({
+                        result: {manipulation1: true}
+                    })
+                },
+                {
+                    [hookName]: ({result}) => ({
+                        result: {...(result as any), manipulation2: true}
+                    })
+                }
+            ]);
 
             const result = await registry[hookName](data);
 
-            assert.deepStrictEqual(result, {manipulated: true});
+            assert.deepStrictEqual(result, {manipulation1: true, manipulation2: true});
         });
 
         await testGenerals(hookName, data);
@@ -549,7 +605,7 @@ await describe('PluginRegistry', async () => {
         };
 
         await it('can suppress errors', async () => {
-            const registry = createPluginRegistry({
+            const registry = mockPluginRegistry({
                 [hookName]: () => ({suppress: true})
             });
 
@@ -557,7 +613,7 @@ await describe('PluginRegistry', async () => {
         });
 
         await it('throws original error', async () => {
-            const registry = createPluginRegistry({
+            const registry = mockPluginRegistry({
                 [hookName]: () => ({suppress: false})
             });
 
@@ -566,7 +622,7 @@ await describe('PluginRegistry', async () => {
                 originalError
             );
 
-            const registry2 = createPluginRegistry({
+            const registry2 = mockPluginRegistry({
                 [hookName]: () => {}
             });
 
@@ -589,7 +645,7 @@ await describe('PluginRegistry', async () => {
             error: 42
         };
 
-        const registry = createPluginRegistry(
+        const registry = mockPluginRegistry(
             {[hookName]: hook},
             {errorStrategy: 'ignore'}
         );
@@ -601,7 +657,7 @@ await describe('PluginRegistry', async () => {
     await describe('errorStrategy', async () => {
         await it('`throw` propagates plugin errors', async () => {
             const unexpectedError = new Error('Book');
-            const registry = createPluginRegistry({
+            const registry = mockPluginRegistry({
                 beforeCommandValidation: () => {
                     throw unexpectedError;
                 }
@@ -619,7 +675,7 @@ await describe('PluginRegistry', async () => {
 
         await it('`ignore` suppresses plugin errors', async () => {
             const unexpectedError = new Error('Book');
-            const registry = createPluginRegistry({
+            const registry = mockPluginRegistry({
                 beforeCommandValidation: () => {
                     throw unexpectedError;
                 }
@@ -645,12 +701,12 @@ await describe('PluginRegistry', async () => {
             };
 
             await it('using the plugin\'s name', async () => {
-                const registry = createPluginRegistry(hooks, {
+                const registry = mockPluginRegistry(hooks, {
                     name: pluginName,
                     errorStrategy: 'log'
                 });
 
-                const {calls, reset} = mockConsole('error');
+                const {consoleCalls, resetConsoleMock} = mockConsole('error');
 
                 try
                 {
@@ -662,23 +718,23 @@ await describe('PluginRegistry', async () => {
                         })
                     );
 
-                    assert.equal(calls.length, 1);
-                    assert.deepEqual(calls[0], [`Plugin ${pluginName} error in 'beforeCommandValidation':`, unexpectedError]);
+                    assert.equal(consoleCalls.length, 1);
+                    assert.deepStrictEqual(consoleCalls[0], [`Plugin ${pluginName} error in 'beforeCommandValidation':`, unexpectedError]);
                 }
                 finally
                 {
-                    reset();
+                    resetConsoleMock();
                 }
             });
 
             await it('using the plugin\'s handle (as fallback)', async () => {
-                const registry = createPluginRegistry(hooks, {
+                const registry = mockPluginRegistry(hooks, {
                     handle: pluginHandle,
                     name: undefined,
                     errorStrategy: 'log'
                 });
 
-                const {calls, reset} = mockConsole('error');
+                const {consoleCalls, resetConsoleMock} = mockConsole('error');
 
                 try
                 {
@@ -690,25 +746,25 @@ await describe('PluginRegistry', async () => {
                         })
                     );
 
-                    assert.equal(calls.length, 1);
-                    assert.deepEqual(calls[0], [`Plugin ${pluginHandle} error in 'beforeCommandValidation':`, unexpectedError]);
+                    assert.equal(consoleCalls.length, 1);
+                    assert.deepStrictEqual(consoleCalls[0], [`Plugin ${pluginHandle} error in 'beforeCommandValidation':`, unexpectedError]);
                 }
                 finally
                 {
-                    reset();
+                    resetConsoleMock();
                 }
             });
         });
 
         await it('uses `log` as default', async () => {
             const unexpectedError = new Error('Book');
-            const registry = createPluginRegistry({
+            const registry = mockPluginRegistry({
                 beforeCommandValidation: () => {
                     throw unexpectedError;
                 }
             }, {errorStrategy: undefined});
 
-            const {calls, reset} = mockConsole('error');
+            const {consoleCalls, resetConsoleMock} = mockConsole('error');
 
             try
             {
@@ -719,11 +775,11 @@ await describe('PluginRegistry', async () => {
                         payload: {p: 1}
                     })
                 );
-                assert.equal(calls.length, 1);
+                assert.equal(consoleCalls.length, 1);
             }
             finally
             {
-                reset();
+                resetConsoleMock();
             }
         });
     });

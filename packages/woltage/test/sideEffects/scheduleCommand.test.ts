@@ -12,6 +12,6 @@ await describe('scheduleCommand', async () => {
 
     await it('does not throw if called within a projection context', async () => {
         mockProjectionContext({isReplaying: false});
-        await assert.doesNotReject(() => scheduleCommand(new Date(), commandInfo, aggregateId, {}));
+        await assert.doesNotReject(scheduleCommand(new Date(), commandInfo, aggregateId, {}));
     });
 });

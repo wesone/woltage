@@ -202,35 +202,40 @@ class Aggregate<TState = any>
 
         const commandInfo = this.#commands[commandName];
         const {eventStore, context, pluginRegistry} = readContext(executionStorage);
-
-        const beforeCommandValidationResult = await pluginRegistry?.run('beforeCommandValidation', {
-            commandInfo,
-            aggregateId,
-            payload,
-            context
-        });
-        if(beforeCommandValidationResult !== undefined)
-            payload = beforeCommandValidationResult;
-
-        try
+        if(commandInfo.schema)
         {
-            const {schema} = commandInfo;
-            payload = schema
-                ? await validate(schema, payload)
-                : payload;
-        }
-        catch(error)
-        {
-            if(!pluginRegistry)
-                throw error;
+            let skipValidation = false;
 
-            await pluginRegistry?.handleError('onCommandValidationError', {
+            const beforeCommandValidationResult = await pluginRegistry?.run('beforeCommandValidation', {
                 commandInfo,
                 aggregateId,
                 payload,
-                context,
-                error
+                context
             });
+            if(beforeCommandValidationResult !== undefined)
+            {
+                payload = beforeCommandValidationResult.payload;
+                skipValidation = beforeCommandValidationResult.skip;
+            }
+
+            try
+            {
+                if(!skipValidation)
+                    payload = await validate(commandInfo.schema, payload);
+            }
+            catch(error)
+            {
+                if(!pluginRegistry)
+                    throw error;
+
+                await pluginRegistry?.handleError('onCommandValidationError', {
+                    commandInfo,
+                    aggregateId,
+                    payload,
+                    context,
+                    error
+                });
+            }
         }
 
         try

@@ -1,14 +1,14 @@
-export default function mockConsole(prop: 'log' | 'warn' | 'error')
+export default function mockConsole(prop: 'log' | 'warn' | 'error' | 'trace')
 {
     const originalConsoleValue = console[prop];
-    const calls: unknown[] = [];
+    const consoleCalls: unknown[] = [];
     console[prop] = (...args: unknown[]) => {
-        calls.push(args);
+        consoleCalls.push(args);
     };
 
     return {
-        calls,
-        reset: () => {
+        consoleCalls,
+        resetConsoleMock: () => {
             console[prop] = originalConsoleValue;
         }
     };

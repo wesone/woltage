@@ -26,11 +26,11 @@ await describe('validate', async () => {
     });
 
     await it('throws BadRequestError if validation fails', async () => {
-        assert.rejects(() => validate(schema, {str: '42'}), BadRequestError);
+        await assert.rejects(validate(schema, {str: '42'}), BadRequestError);
     });
 
     await it('does not swallow unexpected errors that do not relate to Zod parsing', async () => {
         schema.parse = () => {throw new Error('Test');};
-        assert.rejects(() => validate(schema, {str: '42'}));
+        await assert.rejects(validate(schema, {str: '42'}));
     });
 });

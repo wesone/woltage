@@ -58,17 +58,19 @@ abstract class ReadModel<TProjector extends Projector<any> = any>
     }
 
     async call(handlerName: string, query: any) {
-        if(!(handlerName in this) || Object.getOwnPropertyNames(ReadModel.prototype).includes(handlerName))
+        if(
+            !(handlerName in this)
+            || Object.getOwnPropertyNames(ReadModel.prototype).includes(handlerName)
+            || !(this[handlerName as keyof this] instanceof Function)
+        )
             throw new NotFoundError(`Handler '${handlerName}' of read model '${this.constructor.name}' not found.`);
 
-        const handler = this[handlerName as keyof this];
-        if(!(handler instanceof Function))
-            return;
-
+        const handler = this[handlerName as keyof this] as Function;
         const {context, pluginRegistry} = executionStorage.getStore() ?? {};
 
         if(handlerName in this.schemaRegistry)
         {
+            let skipValidation = false;
             const beforeReadModelValidationResult = await pluginRegistry?.beforeReadModelValidation({
                 readModel: this,
                 handlerName,
@@ -76,11 +78,15 @@ abstract class ReadModel<TProjector extends Projector<any> = any>
                 context
             });
             if(beforeReadModelValidationResult !== undefined)
-                query = beforeReadModelValidationResult;
+            {
+                query = beforeReadModelValidationResult.query;
+                skipValidation = beforeReadModelValidationResult.skip;
+            }
 
             try
             {
-                query = await this.validate(this.schemaRegistry[handlerName]!, query);
+                if(!skipValidation)
+                    query = await this.validate(this.schemaRegistry[handlerName]!, query);
             }
             catch(error)
             {
@@ -119,7 +125,7 @@ abstract class ReadModel<TProjector extends Projector<any> = any>
             let result;
             try
             {
-                result = handler.bind(this)(query, readModelContext);
+                result = await handler.bind(this)(query, readModelContext);
             }
             catch(error)
             {

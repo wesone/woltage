@@ -577,9 +577,9 @@ await describe('EventCaster', async () => {
             const EventV3 = mockEventClass(eventType, 3, z.object({c: z.string().meta({renamedFrom: 'b'})}));
 
             const caster = new EventCaster(eventMap);
-            assert.doesNotReject(() => caster.cast(new EventV1({aggregateId: 'aggregateId', payload: {a: 'value'}}), 2));
-            assert.rejects(() => caster.cast(new EventV1({aggregateId: 'aggregateId', payload: {a: 'value'}}), 3));
-            assert.rejects(() => caster.cast(new EventV3({aggregateId: 'aggregateId', payload: {c: 'value'}}), 1));
+            await assert.doesNotReject(caster.cast(new EventV1({aggregateId: 'aggregateId', payload: {a: 'value'}}), 2));
+            await assert.rejects(caster.cast(new EventV1({aggregateId: 'aggregateId', payload: {a: 'value'}}), 3));
+            await assert.rejects(caster.cast(new EventV3({aggregateId: 'aggregateId', payload: {c: 'value'}}), 1));
         });
     });
 });

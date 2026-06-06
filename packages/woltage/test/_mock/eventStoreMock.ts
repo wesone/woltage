@@ -2,6 +2,7 @@ import {type Mock, mock} from 'node:test';
 import {PassThrough} from 'node:stream';
 import {
     type AppendRevision,
+    type DeleteOptions,
     type Filter,
     type SubscribeOptions,
     type ReadOptions,
@@ -32,6 +33,7 @@ class EventStoreMock implements IEventStore
     append: Mock<IEventStore['append']>;
     getLatestPosition: Mock<IEventStore['getLatestPosition']>;
     subscribe: Mock<IEventStore['subscribe']>;
+    delete: Mock<IEventStore['delete']>;
 
     constructor() {
         const state = this.state;
@@ -112,6 +114,32 @@ class EventStoreMock implements IEventStore
                     .forEach(type => (this.state.subscriptions[type] ??= []).push(stream));
 
                 return stream;
+            }
+        );
+
+        this.delete = mock.fn(
+            async (aggregateType: string, aggregateId: string, options?: DeleteOptions) => {
+                if(!state.existingEvents[aggregateType]?.length)
+                {
+                    if(options?.revision === STATE_NEW)
+                        return;
+                    throw new NotFoundError();
+                }
+
+                const events = state.existingEvents[aggregateType]
+                    .filter(event => event.aggregateId === aggregateId);
+
+                if(
+                    options?.revision !== undefined
+                    && (
+                        options.revision === STATE_NEW
+                        || options.revision !== BigInt(events.length - 1)
+                    )
+                )
+                    throw new ConflictError();
+
+                state.existingEvents[aggregateType] = state.existingEvents[aggregateType]
+                    .filter(event => event.aggregateId !== aggregateId);
             }
         );
     }

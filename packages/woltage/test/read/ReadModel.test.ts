@@ -16,6 +16,10 @@ class TestProjection extends ReadModel {
     async find(query: {key: string}) {
         return query.key;
     }
+
+    async throwingHandler(query: {error: Error}) {
+        throw query.error;
+    }
 }
 
 await describe('ReadModel', async () => {
@@ -77,8 +81,16 @@ await describe('ReadModel', async () => {
             assert.strictEqual(result, 'Hello Alice');
         });
 
-        await it('throws if handler not found', async () => {
+        await it('throws if handler is not found', async () => {
             await assert.rejects(instance.call('unknownHandler', {}));
+        });
+
+        await it('does not swallow exceptions that occur in read model handlers', async () => {
+            const error = new Error('Test error');
+            await assert.rejects(
+                instance.call('throwingHandler', {error}),
+                error
+            );
         });
 
         await it('handles schema validation', async () => {

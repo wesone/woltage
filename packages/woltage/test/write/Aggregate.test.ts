@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import Aggregate from '../../src/write/Aggregate.ts';
 import eventStore from '../_mock/eventStoreMock.ts';
 import mockEventClass from '../_mock/mockEventClass.ts';
-import {executionStorage} from '../../src/localStorages.ts';
+import mockExecutionContext from '../_mock/mockExecutionContext.ts';
 import {STATE_NEW} from '../../src/adapters/EventStore.ts';
 import z from 'zod';
 import StoreMock from '../_mock/StoreMock.ts';
@@ -19,7 +19,7 @@ await describe('Aggregate', async () => {
     });
 
     await it('can have commands', async () => {
-        (executionStorage as any).enterWith({eventStore});
+        mockExecutionContext({eventStore});
 
         const initState = {test: 42};
         const aggregate = Aggregate.create('test', {
@@ -64,7 +64,7 @@ await describe('Aggregate', async () => {
         const aggregate = Aggregate.create('test', {});
         const schema = z.any();
         const command = function doSomething() {};
-        assert.deepEqual(
+        assert.deepStrictEqual(
             aggregate.registerCommand(schema, command),
             {
                 aggregate,
@@ -77,7 +77,7 @@ await describe('Aggregate', async () => {
     });
 
     await it('constructs aggregate state for commands', async () => {
-        (executionStorage as any).enterWith({eventStore});
+        mockExecutionContext({eventStore});
 
         const aggregateType = 'test';
         const PetRegisteredEvent = mockEventClass('pet.registered');
@@ -130,7 +130,7 @@ await describe('Aggregate', async () => {
     });
 
     await it('constructs aggregate state and uses `$all` as a fallback handler', async () => {
-        (executionStorage as any).enterWith({eventStore});
+        mockExecutionContext({eventStore});
 
         const aggregateType = 'test';
         const PetRegisteredEvent = mockEventClass('pet.registered');
@@ -169,7 +169,7 @@ await describe('Aggregate', async () => {
     });
 
     await it('constructs aggregate state even if no handler exists', async () => {
-        (executionStorage as any).enterWith({eventStore});
+        mockExecutionContext({eventStore});
 
         const aggregateType = 'test';
         const PetRegisteredEvent = mockEventClass('pet.registered');
@@ -202,7 +202,7 @@ await describe('Aggregate', async () => {
     });
 
     await it('does not swallow exceptions that occur in aggregate projector', async () => {
-        (executionStorage as any).enterWith({eventStore});
+        mockExecutionContext({eventStore});
 
         const TestEvent = mockEventClass('test');
         const aggregateType = 'test';
@@ -220,11 +220,34 @@ await describe('Aggregate', async () => {
         const command = mock.fn(function doSomething() {});
         aggregate.registerCommand(command);
 
-        await assert.rejects(() => aggregate.executeCommand(aggregateId, command.name, {}));
+        await assert.rejects(aggregate.executeCommand(aggregateId, command.name, {}));
+    });
+
+    await it('does not swallow exceptions that occur in command handlers', async () => {
+        mockExecutionContext({eventStore});
+
+        const TestEvent = mockEventClass('test');
+        const aggregateType = 'test';
+        const aggregateId = 'aggregateId1';
+        eventStore.mock({
+            [aggregateType]: [
+                new TestEvent({aggregateId, payload: {}})
+            ]
+        });
+        const aggregate = Aggregate.create(aggregateType, {});
+        const command = mock.fn(
+            function doSomething()
+            {
+                throw new Error('Test error');
+            }
+        );
+        aggregate.registerCommand(command);
+
+        await assert.rejects(aggregate.executeCommand(aggregateId, command.name, {}));
     });
 
     await it('uses eventCastingFallback when set', async () => {
-        (executionStorage as any).enterWith({eventStore});
+        mockExecutionContext({eventStore});
 
         const EventV1 = mockEventClass('test.event', 1);
         const EventV2 = mockEventClass('test.event', 2);
@@ -274,12 +297,12 @@ await describe('Aggregate', async () => {
         );
 
         await it('can append an event', async () => {
-            (executionStorage as any).enterWith({eventStore});
+            mockExecutionContext({eventStore});
 
             const commandPayload = {cmd: 21};
             const aggregateId = 'fourtytwo';
 
-            await assert.doesNotReject(() => aggregate.executeCommand(aggregateId, commandName, commandPayload));
+            await assert.doesNotReject(aggregate.executeCommand(aggregateId, commandName, commandPayload));
 
             assert.strictEqual(eventStore.append.mock.callCount(), 1);
             assert.partialDeepStrictEqual(
@@ -294,7 +317,7 @@ await describe('Aggregate', async () => {
         });
 
         await it('can append multiple events', async () => {
-            (executionStorage as any).enterWith({eventStore});
+            mockExecutionContext({eventStore});
 
             const {name: commandName} = aggregate.registerCommand(
                 function multipleEvents(state: any, payload: any) {
@@ -312,7 +335,7 @@ await describe('Aggregate', async () => {
             const commandPayload = {cmd: 21};
             const aggregateId = 'fourtytwo';
 
-            await assert.doesNotReject(() => aggregate.executeCommand(aggregateId, commandName, commandPayload));
+            await assert.doesNotReject(aggregate.executeCommand(aggregateId, commandName, commandPayload));
 
             assert.strictEqual(eventStore.append.mock.callCount(), 1);
             assert.partialDeepStrictEqual(
@@ -330,7 +353,7 @@ await describe('Aggregate', async () => {
         });
 
         await it('validate payload against schema', async () => {
-            (executionStorage as any).enterWith({eventStore});
+            mockExecutionContext({eventStore});
 
             const aggregate = Aggregate.create('test', {});
             const command = () => {};
@@ -342,13 +365,13 @@ await describe('Aggregate', async () => {
             );
             const aggregateId = 'fourtytwo';
 
-            await assert.rejects(() => aggregate.executeCommand(aggregateId, command.name, {}));
-            await assert.rejects(() => aggregate.executeCommand(aggregateId, command.name, {num: '42'}));
-            await assert.doesNotReject(() => aggregate.executeCommand(aggregateId, command.name, {num: 42}));
+            await assert.rejects(aggregate.executeCommand(aggregateId, command.name, {}));
+            await assert.rejects(aggregate.executeCommand(aggregateId, command.name, {num: '42'}));
+            await assert.doesNotReject(aggregate.executeCommand(aggregateId, command.name, {num: 42}));
         });
 
         await it('use optimistic concurrency control per aggregate id', async () => {
-            (executionStorage as any).enterWith({eventStore});
+            mockExecutionContext({eventStore});
 
             const aggregateId = 'fourtytwo';
 
@@ -375,7 +398,7 @@ await describe('Aggregate', async () => {
                 }
             );
 
-            (executionStorage as any).enterWith({eventStore});
+            mockExecutionContext({eventStore});
 
             const aggregateId = 'fourtytwo';
 
@@ -392,7 +415,7 @@ await describe('Aggregate', async () => {
     });
 
     await it('uses existing snapshot to prevent aggregating the whole stream', async () => {
-        (executionStorage as any).enterWith({eventStore});
+        mockExecutionContext({eventStore});
 
         const aggregateType = 'test';
         const PetRegisteredEvent = mockEventClass('pet.registered');
