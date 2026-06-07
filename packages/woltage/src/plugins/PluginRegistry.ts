@@ -4,16 +4,6 @@ import type {CommandInfo, CommandContext, StateUpdate} from '../write/Aggregate.
 type FilterBySuffix<T extends string, Suffix extends string> =
     T extends `${string}${Suffix}` ? T : never;
 
-class PluginBreakError extends Error
-{
-    returnedError;
-
-    constructor(returnedError: Error) {
-        super();
-        this.returnedError = returnedError;
-    }
-}
-
 type GeneralHookResult = {
     /**
      * Indicates whether the execution of subsequent hooks for this event should be stopped.
@@ -21,7 +11,10 @@ type GeneralHookResult = {
      * Set to `true` to prevent calling registered hooks after this one for the current event.
      */
     breakChain?: boolean;
-    /** Return an error to be thrown regardless of the specified `errorStrategy`. */
+    /**
+     * Return an error to be thrown after calling the registered hooks for the current event
+     * regardless of the specified `errorStrategy`.
+     */
     error?: Error;
 };
 
@@ -226,7 +219,7 @@ export interface Plugin {
 
 export type Hooks = Required<NonNullable<Plugin['hooks']>>;
 export type HookName = keyof Hooks;
-type ErrorHookName = FilterBySuffix<HookName, 'Error'>;
+export type ErrorHookName = FilterBySuffix<HookName, 'Error'>;
 
 export type HookData<
     T extends HookDefinition<any, any> | HookName,
@@ -303,17 +296,11 @@ export class PluginRegistry implements HookExecutors
             {
                 const result = await (hook(data as any) as HookResult<T>);
                 await processor(result, plugin);
-                if(result?.error !== undefined)
-                    throw new PluginBreakError(result.error);
                 if(result?.breakChain)
                     break;
             }
             catch(error)
             {
-                // PluginBreakError is always fatal regardless of errorStrategy setting
-                if(error instanceof PluginBreakError)
-                    throw error.returnedError;
-
                 const strategy = plugin.errorStrategy ?? 'log';
                 if(strategy === 'log')
                     console.error(`Plugin ${this.#getDisplayName(plugin)} error in '${hookName}':`, error);
@@ -329,16 +316,10 @@ export class PluginRegistry implements HookExecutors
     }
 
     async handleError<T extends ErrorHookName>(hookName: T, data: Omit<HookData<T>, 'error'> & {error: unknown}) {
-        if(data.error instanceof Error)
-        {
-            const errorHookResult = await this.run(hookName, data as HookData<T>);
-            if(errorHookResult.suppress)
-                return;
+        if(!(data.error instanceof Error))
+            throw data.error;
 
-            throw errorHookResult.error;
-        }
-
-        throw data.error;
+        await this.run(hookName, data as HookData<T>);
     }
 
     async errorHookExecutor<T extends ErrorHookName>(hookName: T, data: HookData<T>) {
@@ -358,27 +339,36 @@ export class PluginRegistry implements HookExecutors
             }
         });
 
-        return {error, suppress: shouldSuppress};
+        if(shouldSuppress)
+            return;
+
+        throw error;
     }
 
     async beforeCommandValidation(data: HookData<BeforeCommandValidationHook>) {
+        let error: Error | null = null;
         const returnValue = {
             payload: data.payload,
             skip: false
         };
 
         await this.#callHooks('beforeCommandValidation', data, async result => {
-            if(result)
+            if(!result)
+                return;
+
+            if(result.error)
+                error = result.error;
+            if(result.payload !== undefined)
             {
-                if(result.payload !== undefined)
-                {
-                    returnValue.payload = result.payload;
-                    data.payload = returnValue.payload;
-                }
-                if(result.skip !== undefined)
-                    returnValue.skip = result.skip;
+                returnValue.payload = result.payload;
+                data.payload = returnValue.payload;
             }
+            if(result.skip !== undefined)
+                returnValue.skip = result.skip;
         });
+
+        if(error)
+            throw error;
 
         return returnValue;
     }
@@ -388,6 +378,7 @@ export class PluginRegistry implements HookExecutors
     }
 
     async beforeCommandExecution(data: HookData<BeforeCommandExecutionHook>) {
+        let error: Error | null = null;
         const returnValue = {
             payload: data.payload,
             state: data.state,
@@ -396,17 +387,22 @@ export class PluginRegistry implements HookExecutors
         const returnKeys = Object.keys(returnValue) as (keyof typeof returnValue)[];
 
         await this.#callHooks('beforeCommandExecution', data, async result => {
-            if(result)
-            {
-                returnKeys.forEach(key => {
-                    if(key in result)
-                    {
-                        returnValue[key] = result[key] as any;
-                        data[key] = returnValue[key] as any;
-                    }
-                });
-            }
+            if(!result)
+                return;
+
+            if(result.error)
+                error = result.error;
+            returnKeys.forEach(key => {
+                if(key in result)
+                {
+                    returnValue[key] = result[key] as any;
+                    data[key] = returnValue[key] as any;
+                }
+            });
         });
+
+        if(error)
+            throw error;
 
         return returnValue;
     }
@@ -416,18 +412,24 @@ export class PluginRegistry implements HookExecutors
     }
 
     async afterCommandExecution(data: HookData<AfterCommandExecutionHook>) {
+        let error: Error | null = null;
         let stateUpdate = data.stateUpdate;
 
         await this.#callHooks('afterCommandExecution', data, async result => {
-            if(result)
+            if(!result)
+                return;
+
+            if(result.error)
+                error = result.error;
+            if(result.stateUpdate !== undefined)
             {
-                if(result.stateUpdate !== undefined)
-                {
-                    stateUpdate = result.stateUpdate;
-                    data.stateUpdate = stateUpdate;
-                }
+                stateUpdate = result.stateUpdate;
+                data.stateUpdate = stateUpdate;
             }
         });
+
+        if(error)
+            throw error;
 
         return stateUpdate;
     }
@@ -437,23 +439,29 @@ export class PluginRegistry implements HookExecutors
     }
 
     async beforeReadModelValidation(data: HookData<BeforeReadModelValidationHook>) {
+        let error: Error | null = null;
         const returnValue = {
             query: data.query,
             skip: false
         };
 
         await this.#callHooks('beforeReadModelValidation', data, async result => {
-            if(result)
+            if(!result)
+                return;
+
+            if(result.error)
+                error = result.error;
+            if(result.query !== undefined)
             {
-                if(result.query !== undefined)
-                {
-                    returnValue.query = result.query;
-                    data.query = returnValue.query;
-                }
-                if(result.skip !== undefined)
-                    returnValue.skip = result.skip;
+                returnValue.query = result.query;
+                data.query = returnValue.query;
             }
+            if(result.skip !== undefined)
+                returnValue.skip = result.skip;
         });
+
+        if(error)
+            throw error;
 
         return returnValue;
     }
@@ -463,6 +471,7 @@ export class PluginRegistry implements HookExecutors
     }
 
     async beforeReadModelExecution(data: HookData<BeforeReadModelExecutionHook>) {
+        let error: Error | null = null;
         const returnValue = {
             query: data.query,
             context: data.context
@@ -470,17 +479,22 @@ export class PluginRegistry implements HookExecutors
         const returnKeys = Object.keys(returnValue) as (keyof typeof returnValue)[];
 
         await this.#callHooks('beforeReadModelExecution', data, async result => {
-            if(result)
-            {
-                returnKeys.forEach(key => {
-                    if(key in result)
-                    {
-                        returnValue[key] = result[key] as any;
-                        data[key] = returnValue[key] as any;
-                    }
-                });
-            }
+            if(!result)
+                return;
+
+            if(result.error)
+                error = result.error;
+            returnKeys.forEach(key => {
+                if(key in result)
+                {
+                    returnValue[key] = result[key] as any;
+                    data[key] = returnValue[key] as any;
+                }
+            });
         });
+
+        if(error)
+            throw error;
 
         return returnValue;
     }
@@ -490,20 +504,26 @@ export class PluginRegistry implements HookExecutors
     }
 
     async afterReadModelExecution(data: HookData<AfterReadModelExecutionHook>) {
-        let result = data.result;
+        let error: Error | null = null;
+        let returnValue = data.result;
 
-        await this.#callHooks('afterReadModelExecution', data, async res => {
-            if(res)
+        await this.#callHooks('afterReadModelExecution', data, async result => {
+            if(!result)
+                return;
+
+            if(result.error)
+                error = result.error;
+            if(result.result !== undefined)
             {
-                if(res.result !== undefined)
-                {
-                    result = res.result;
-                    data.result = result;
-                }
+                returnValue = result.result;
+                data.result = returnValue;
             }
         });
 
-        return result;
+        if(error)
+            throw error;
+
+        return returnValue;
     }
 
     async onReadModelError(data: HookData<OnReadModelErrorHook>) {

@@ -23,7 +23,7 @@ await describe('beforeReadModelExecution hook', async () => {
         });
 
         let receivedArgs: unknown;
-        const readModel = mockReadModel({
+        const readModel = await mockReadModel({
             test(query: unknown, context: unknown)
             {
                 receivedArgs = [query, context];

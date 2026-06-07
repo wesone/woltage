@@ -20,7 +20,7 @@ await describe('beforeReadModelValidation hook', async () => {
         });
 
         let receivedQuery: unknown;
-        const readModel = mockReadModel({
+        const readModel = await mockReadModel({
             test(query)
             {
                 receivedQuery = query;
@@ -49,7 +49,7 @@ await describe('beforeReadModelValidation hook', async () => {
         });
 
         let called = false;
-        const readModel = mockReadModel({
+        const readModel = await mockReadModel({
             test()
             {
                 called = true;

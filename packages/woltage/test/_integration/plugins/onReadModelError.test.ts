@@ -16,7 +16,7 @@ await describe('onReadModelError hook', async () => {
             }
         });
 
-        const readModel = mockReadModel({
+        const readModel = await mockReadModel({
             test()
             {
                 throw new Error('Original');
@@ -42,7 +42,7 @@ await describe('onReadModelError hook', async () => {
             }
         });
 
-        const readModel = mockReadModel({
+        const readModel = await mockReadModel({
             test()
             {
                 throw new Error('Original');

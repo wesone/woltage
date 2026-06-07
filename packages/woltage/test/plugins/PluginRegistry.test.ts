@@ -1,7 +1,7 @@
 import {describe, it, mock} from 'node:test';
 import assert from 'node:assert/strict';
 
-import PluginRegistry, {type HookData, type HookName} from '../../src/plugins/PluginRegistry.ts';
+import PluginRegistry, {type HookData, type HookName, type ErrorHookName} from '../../src/plugins/PluginRegistry.ts';
 import mockPlugin, {mockPluginRegistry} from '../_mock/mockPlugin.ts';
 import mockEventClass from '../_mock/mockEventClass.ts';
 import {mockReadModel} from '../_mock/ReadModelMock.ts';
@@ -18,7 +18,7 @@ await describe('PluginRegistry', async () => {
             }, {errorStrategy: 'ignore'});
 
             await assert.rejects(
-                registry[hookName](data as any),
+                registry[hookName]({...(data as any)}),
                 forcedError
             );
         });
@@ -26,7 +26,7 @@ await describe('PluginRegistry', async () => {
         await it('can stop calling subsequent plugins by providing `breakChain: true`', async () => {
             const registry = mockPluginRegistry([
                 {
-                    [hookName]: () => ({})
+                    [hookName]: () => {}
                 },
                 {
                     [hookName]: () => ({
@@ -34,7 +34,6 @@ await describe('PluginRegistry', async () => {
                     })
                 }
             ]);
-
             const registry2 = mockPluginRegistry([
                 {
                     [hookName]: () => ({
@@ -49,10 +48,88 @@ await describe('PluginRegistry', async () => {
             ]);
 
             await assert.rejects(
-                registry[hookName](data as any),
+                registry[hookName]({...(data as any)}),
                 forcedError
             );
-            await assert.doesNotReject(registry2[hookName](data as any));
+            await assert.doesNotReject(registry2[hookName]({...(data as any)}));
+        });
+    };
+    const testErrorGenerals = async <T extends ErrorHookName>(hookName: T, data: HookData<T>) => {
+        const originalError = data.error;
+
+        await it('can suppress errors', async () => {
+            const registry = mockPluginRegistry({
+                [hookName]: () => ({suppress: true})
+            });
+
+            await assert.doesNotReject(registry.handleError(hookName, {...data}));
+        });
+
+        await it('throws original error', async () => {
+            const registry = mockPluginRegistry({
+                [hookName]: () => ({suppress: false})
+            });
+
+            await assert.rejects(
+                registry.handleError(hookName, {...data}),
+                originalError
+            );
+
+            const registry2 = mockPluginRegistry({
+                [hookName]: () => {}
+            });
+
+            await assert.rejects(
+                registry2.handleError(hookName, {...data}),
+                originalError
+            );
+        });
+
+        await it('can modify thrown error by providing an `error`', async () => {
+            const registry = mockPluginRegistry({
+                [hookName]: () => ({
+                    error: forcedError
+                })
+            }, {errorStrategy: 'ignore'});
+
+            await assert.rejects(
+                registry[hookName]({...(data as any)}),
+                forcedError
+            );
+        });
+
+        await it('can stop calling subsequent plugins by providing `breakChain: true`', async () => {
+            const registry = mockPluginRegistry([
+                {
+                    [hookName]: () => {}
+                },
+                {
+                    [hookName]: () => ({
+                        error: forcedError
+                    })
+                }
+            ]);
+            const registry2 = mockPluginRegistry([
+                {
+                    [hookName]: () => ({
+                        breakChain: true
+                    })
+                },
+                {
+                    [hookName]: () => ({
+                        error: forcedError
+                    })
+                }
+            ]);
+
+            await assert.rejects(
+                registry[hookName]({...(data as any)}),
+                forcedError
+            );
+            await assert.rejects(
+                registry2[hookName]({...(data as any)}),
+                originalError
+            );
         });
     };
 
@@ -181,43 +258,14 @@ await describe('PluginRegistry', async () => {
 
     await describe('onCommandValidationError', async () => {
         const hookName = 'onCommandValidationError';
-        const originalError = new Error('Original');
         const data = {
             commandInfo: {} as any,
             aggregateId: 'a',
             payload: {p: 1},
-            error: originalError
+            error: new Error('Original')
         };
 
-        await it('can suppress errors', async () => {
-            const registry = mockPluginRegistry({
-                [hookName]: () => ({suppress: true})
-            });
-
-            await assert.doesNotReject(registry.handleError(hookName, data));
-        });
-
-        await it('throws original error', async () => {
-            const registry = mockPluginRegistry({
-                [hookName]: () => ({suppress: false})
-            });
-
-            await assert.rejects(
-                registry.handleError(hookName, data),
-                originalError
-            );
-
-            const registry2 = mockPluginRegistry({
-                [hookName]: () => {}
-            });
-
-            await assert.rejects(
-                registry2.handleError(hookName, data),
-                originalError
-            );
-        });
-
-        await testGenerals(hookName, data);
+        await testErrorGenerals(hookName, data);
     });
 
     await describe('beforeCommandExecution ', async () => {
@@ -272,45 +320,16 @@ await describe('PluginRegistry', async () => {
 
     await describe('onCommandExecutionError', async () => {
         const hookName = 'onCommandExecutionError';
-        const originalError = new Error('Original');
         const data = {
             commandInfo: {} as any,
             aggregateId: 'a',
             payload: {p: 1},
             state: {s: 1},
             context: {aggregateId: 'a1', aggregateVersion: 42},
-            error: originalError
+            error: new Error('Original')
         };
 
-        await it('can suppress errors', async () => {
-            const registry = mockPluginRegistry({
-                [hookName]: () => ({suppress: true})
-            });
-
-            await assert.doesNotReject(registry.handleError(hookName, data));
-        });
-
-        await it('throws original error', async () => {
-            const registry = mockPluginRegistry({
-                [hookName]: () => ({suppress: false})
-            });
-
-            await assert.rejects(
-                registry.handleError(hookName, data),
-                originalError
-            );
-
-            const registry2 = mockPluginRegistry({
-                [hookName]: () => {}
-            });
-
-            await assert.rejects(
-                registry2.handleError(hookName, data),
-                originalError
-            );
-        });
-
-        await testGenerals(hookName, data);
+        await testErrorGenerals(hookName, data);
     });
 
     await describe('afterCommandExecution', async () => {
@@ -346,43 +365,14 @@ await describe('PluginRegistry', async () => {
 
     await describe('onCommandError', async () => {
         const hookName = 'onCommandError';
-        const originalError = new Error('Original');
         const data = {
             commandInfo: {} as any,
             aggregateId: 'a',
             payload: {p: 1},
-            error: originalError
+            error: new Error('Original')
         };
 
-        await it('can suppress errors', async () => {
-            const registry = mockPluginRegistry({
-                [hookName]: () => ({suppress: true})
-            });
-
-            await assert.doesNotReject(registry.handleError(hookName, data));
-        });
-
-        await it('throws original error', async () => {
-            const registry = mockPluginRegistry({
-                [hookName]: () => ({suppress: false})
-            });
-
-            await assert.rejects(
-                registry.handleError(hookName, data),
-                originalError
-            );
-
-            const registry2 = mockPluginRegistry({
-                [hookName]: () => {}
-            });
-
-            await assert.rejects(
-                registry2.handleError(hookName, data),
-                originalError
-            );
-        });
-
-        await testGenerals(hookName, data);
+        await testErrorGenerals(hookName, data);
     });
 
     await describe('beforeReadModelValidation', async () => {
@@ -440,43 +430,14 @@ await describe('PluginRegistry', async () => {
 
     await describe('onReadModelValidationError', async () => {
         const hookName = 'onReadModelValidationError';
-        const originalError = new Error('Original');
         const data = {
             readModel: await mockReadModel(),
             handlerName: '',
             query: {q: 1},
-            error: originalError
+            error: new Error('Original')
         };
 
-        await it('can suppress errors', async () => {
-            const registry = mockPluginRegistry({
-                [hookName]: () => ({suppress: true})
-            });
-
-            await assert.doesNotReject(registry.handleError(hookName, data));
-        });
-
-        await it('throws original error', async () => {
-            const registry = mockPluginRegistry({
-                [hookName]: () => ({suppress: false})
-            });
-
-            await assert.rejects(
-                registry.handleError(hookName, data),
-                originalError
-            );
-
-            const registry2 = mockPluginRegistry({
-                [hookName]: () => {}
-            });
-
-            await assert.rejects(
-                registry2.handleError(hookName, data),
-                originalError
-            );
-        });
-
-        await testGenerals(hookName, data);
+        await testErrorGenerals(hookName, data);
     });
 
     await it('beforeReadModelExecution', async () => {
@@ -521,44 +482,15 @@ await describe('PluginRegistry', async () => {
 
     await describe('onReadModelExecutionError', async () => {
         const hookName = 'onReadModelExecutionError';
-        const originalError = new Error('Original');
         const data = {
             readModel: await mockReadModel(),
             handlerName: '',
             query: {q: 1},
             context: {},
-            error: originalError
+            error: new Error('Original')
         };
 
-        await it('can suppress errors', async () => {
-            const registry = mockPluginRegistry({
-                [hookName]: () => ({suppress: true})
-            });
-
-            await assert.doesNotReject(registry.handleError(hookName, data));
-        });
-
-        await it('throws original error', async () => {
-            const registry = mockPluginRegistry({
-                [hookName]: () => ({suppress: false})
-            });
-
-            await assert.rejects(
-                registry.handleError(hookName, data),
-                originalError
-            );
-
-            const registry2 = mockPluginRegistry({
-                [hookName]: () => {}
-            });
-
-            await assert.rejects(
-                registry2.handleError(hookName, data),
-                originalError
-            );
-        });
-
-        await testGenerals(hookName, data);
+        await testErrorGenerals(hookName, data);
     });
 
     await it('afterReadModelExecution', async () => {
@@ -595,44 +527,15 @@ await describe('PluginRegistry', async () => {
 
     await describe('onReadModelError', async () => {
         const hookName = 'onReadModelError';
-        const originalError = new Error('Original');
         const data = {
             readModel: await mockReadModel(),
             handlerName: '',
             query: {q: 1},
             context: {},
-            error: originalError
+            error: new Error('Original')
         };
 
-        await it('can suppress errors', async () => {
-            const registry = mockPluginRegistry({
-                [hookName]: () => ({suppress: true})
-            });
-
-            await assert.doesNotReject(registry.handleError(hookName, data));
-        });
-
-        await it('throws original error', async () => {
-            const registry = mockPluginRegistry({
-                [hookName]: () => ({suppress: false})
-            });
-
-            await assert.rejects(
-                registry.handleError(hookName, data),
-                originalError
-            );
-
-            const registry2 = mockPluginRegistry({
-                [hookName]: () => {}
-            });
-
-            await assert.rejects(
-                registry2.handleError(hookName, data),
-                originalError
-            );
-        });
-
-        await testGenerals(hookName, data);
+        await testErrorGenerals(hookName, data);
     });
 
     await it('handleError rethrows non-error values regardless of errorStrategy', async () => {

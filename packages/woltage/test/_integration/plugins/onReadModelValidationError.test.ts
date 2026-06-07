@@ -18,7 +18,7 @@ await describe('onReadModelValidationError hook', async () => {
         });
 
         let called = false;
-        const readModel = mockReadModel({
+        const readModel = await mockReadModel({
             test()
             {
                 called = true;
@@ -50,7 +50,7 @@ await describe('onReadModelValidationError hook', async () => {
         });
 
         let called = false;
-        const readModel = mockReadModel({
+        const readModel = await mockReadModel({
             test()
             {
                 called = true;

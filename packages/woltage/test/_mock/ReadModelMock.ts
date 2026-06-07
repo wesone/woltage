@@ -9,7 +9,7 @@ class ReadModelMock extends ReadModel
 
 export default ReadModelMock;
 
-export function mockReadModel<
+export async function mockReadModel<
     T extends Record<string,(...args: any[]) => any> = Record<string, () => unknown>
 >(
     handlers?: T,

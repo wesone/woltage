@@ -18,7 +18,7 @@ await describe('afterReadModelExecution hook', async () => {
             }
         });
 
-        const readModel = mockReadModel({
+        const readModel = await mockReadModel({
             test()
             {
                 return {test: 42};
