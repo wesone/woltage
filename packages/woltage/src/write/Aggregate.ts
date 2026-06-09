@@ -73,7 +73,11 @@ export type StateUpdateConfig = {
 
 export type StateUpdate = Event | Event[] | StateUpdateConfig;
 
-export type Command<TState, TPayload extends StandardSchemaV1 = any> = (state: TState, payload: StandardSchemaV1.InferInput<TPayload>, context: CommandContext) => Promise<StateUpdate | void> | StateUpdate | void;
+export type Command<TState, TPayload extends StandardSchemaV1 | null = StandardSchemaV1 | null> = (
+    state: TState,
+    payload: TPayload extends StandardSchemaV1 ? StandardSchemaV1.InferInput<TPayload> : any,
+    context: CommandContext
+) => Promise<StateUpdate | void> | StateUpdate | void;
 
 export type CommandOptions = {
     /**
@@ -86,8 +90,8 @@ export type CommandOptions = {
 export type CommandInfo<TState = any, TPayload extends StandardSchemaV1 | null = StandardSchemaV1 | null> = {
     aggregate: Aggregate<TState>,
     name: string,
-    schema: TPayload,
-    command: Command<TState, TPayload extends StandardSchemaV1 ? TPayload : any>,
+    schema: TPayload extends StandardSchemaV1 ? TPayload : null,
+    command: Command<TState, TPayload>,
     options: CommandOptions
 }
 
@@ -122,8 +126,8 @@ class Aggregate<TState = any>
         this.#registry.setEventCastingFallback(fallback);
     }
 
-    registerCommand(command: Command<TState>, options?: CommandOptions): CommandInfo<TState>;
-    registerCommand<TPayload extends StandardSchemaV1 = any>(schema: TPayload, command: Command<TState, TPayload>, options?: CommandOptions): CommandInfo<TState, TPayload>;
+    registerCommand(command: Command<TState>, options?: CommandOptions): CommandInfo<TState, null>;
+    registerCommand<TPayload extends StandardSchemaV1 = StandardSchemaV1>(schema: TPayload, command: Command<TState, TPayload>, options?: CommandOptions): CommandInfo<TState, TPayload>;
     registerCommand(schema: any, command: any, options?: any) {
         if(typeof schema === 'function')
         {
