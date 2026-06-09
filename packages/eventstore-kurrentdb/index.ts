@@ -1,6 +1,8 @@
 import {
     Event,
+    TombstoneEvent,
     ConflictError,
+    GoneError,
     NotFoundError,
     START,
     END,
@@ -12,8 +14,7 @@ import {
     type AppendRevision,
     type Filter,
     type ReadOptions,
-    type SubscribeOptions,
-    type DeleteOptions
+    type SubscribeOptions
 } from 'woltage';
 import {
     KurrentDBClient,
@@ -25,14 +26,14 @@ import {
     BACKWARDS as KURRENT_BACKWARDS,
     WrongExpectedVersionError,
     StreamNotFoundError,
+    StreamDeletedError,
     eventTypeFilter,
     jsonEvent,
     type JSONEventOptions,
     type Position,
     type ReadStreamOptions,
     type ResolvedEvent,
-    type SubscribeToAllOptions,
-    type TombstoneStreamOptions
+    type SubscribeToAllOptions
 } from '@kurrent/kurrentdb-client';
 import {Transform} from 'stream';
 
@@ -50,6 +51,9 @@ type SerializedJSONEvent = JSONEventOptions<{
     };
     position: Position;
 }>;
+
+// for KurrentDB versions 22.6.0 or later the position property always exists
+type EventRecord = ResolvedEvent<SerializedJSONEvent>['event'] & {position: Position}
 
 const CONSTANTS = Object.freeze({
     [START]: KURRENT_START,
@@ -98,7 +102,7 @@ export default class KurrentDBEventStore implements IEventStore
         });
     }
 
-    #deserializeEvent(event: SerializedJSONEvent) {
+    #deserializeEvent(event: EventRecord) {
         const {
             id,
             type,
@@ -111,8 +115,10 @@ export default class KurrentDBEventStore implements IEventStore
                 causationId,
                 meta
             },
+            revision,
             position: {commit: position}
         } = event;
+
         return Event.fromJSON({
             id,
             type,
@@ -123,6 +129,8 @@ export default class KurrentDBEventStore implements IEventStore
             correlationId,
             causationId,
             meta,
+            // https://github.com/kurrent-io/KurrentDB-Client-NodeJS/issues/513
+            revision: typeof revision === 'number' ? BigInt(revision) : revision,
             position
         }, false);
     }
@@ -148,15 +156,15 @@ export default class KurrentDBEventStore implements IEventStore
                     if(!resolvedEvent.event)
                         continue;
 
-                    yield deserializeEvent(
-                        // for KurrentDB versions 22.6.0 or later the position property always exists
-                        resolvedEvent.event as ResolvedEvent<SerializedJSONEvent>['event'] & {position: Position}
-                    );
+                    yield deserializeEvent(resolvedEvent.event as EventRecord);
                 }
             }
             catch(e)
             {
-                if(e instanceof StreamNotFoundError)
+                if(
+                    e instanceof StreamNotFoundError
+                    || e instanceof StreamDeletedError
+                )
                     throw new NotFoundError(e.message);
                 throw e;
             }
@@ -166,8 +174,19 @@ export default class KurrentDBEventStore implements IEventStore
     async append(aggregateType: string, aggregateId: string, events: Event[], revision?: AppendRevision) {
         try
         {
-            await this.#client.appendToStream(
-                this.#getStreamName(aggregateType, aggregateId),
+            const sendTombstone = events.some((event, idx) => {
+                if(event instanceof TombstoneEvent)
+                {
+                    if(idx === events.length - 1)
+                        return true;
+                    throw new ConflictError(`Tombstone event is not the last event to append in ${aggregateType} aggregate ${aggregateId}.`);
+                }
+                return false;
+            });
+
+            const streamName = this.#getStreamName(aggregateType, aggregateId);
+            const appendResult = await this.#client.appendToStream(
+                streamName,
                 events.map(event => this.#serializeEvent(event)),
                 {
                     streamState: typeof revision === 'string'
@@ -175,11 +194,23 @@ export default class KurrentDBEventStore implements IEventStore
                         : revision
                 }
             );
+
+            if(sendTombstone)
+                await this.#client.tombstoneStream(
+                    streamName,
+                    {
+                        expectedRevision: revision !== undefined
+                            ? appendResult.nextExpectedRevision
+                            : undefined
+                    }
+                );
         }
         catch(e)
         {
             if(e instanceof WrongExpectedVersionError)
                 throw new ConflictError(`State of ${aggregateType} aggregate ${aggregateId} changed in the meantime.`);
+            if(e instanceof StreamDeletedError)
+                throw new GoneError(`State of ${aggregateType} aggregate ${aggregateId} is not available anymore.`);
             throw e;
         }
     }
@@ -228,29 +259,5 @@ export default class KurrentDBEventStore implements IEventStore
             if(resolvedEvent.event?.position)
                 return resolvedEvent.event.position.commit;
         return null;
-    }
-
-    async delete(aggregateType: string, aggregateId: string, options?: DeleteOptions) {
-        // https://docs.kurrent.io/server/v25.0/features/streams.html#deleting-streams-and-events
-        const opts: TombstoneStreamOptions = {};
-        if(options?.revision !== undefined)
-        {
-            opts.expectedRevision = typeof options.revision === 'string'
-                ? CONSTANTS[options.revision]
-                : options.revision;
-        }
-
-        try
-        {
-            await this.#client.tombstoneStream(this.#getStreamName(aggregateType, aggregateId), opts);
-        }
-        catch(e)
-        {
-            if(e instanceof StreamNotFoundError)
-                throw new NotFoundError(e.message);
-            if(e instanceof WrongExpectedVersionError)
-                throw new ConflictError(`Unexpected state of ${aggregateType} aggregate ${aggregateId}.`);
-            throw e;
-        }
     }
 }

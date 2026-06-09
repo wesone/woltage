@@ -18,7 +18,7 @@
     "prepack": "npm run build"
   },
   "dependencies": {
-    "@kurrent/kurrentdb-client": "^1.1.x"
+    "@kurrent/kurrentdb-client": "^1.3.x"
   },
   "peerDependencies": {
     "woltage": "^1.x"
