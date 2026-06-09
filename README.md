@@ -10,6 +10,7 @@ A CQRS and Event-Sourcing Framework.
     * [Version](#version)
     * [Meta Data](#meta-data)
     * [Schema Evolution](#schema-evolution)
+    * [Tombstone](#tombstone-event)
 * [Aggregate](#aggregate)
     * [Aggregate Options](#aggregate-options)
     * [Aggregate Projector](#aggregate-projector)
@@ -28,6 +29,8 @@ A CQRS and Event-Sourcing Framework.
     * [Store](#store)
     * [Scheduler](#scheduler)
 * [Woltage Instance](#woltage-instance)
+* [Plugins](#plugins)
+    * [Plugin Interface](#plugin-interface)
 
 ## Get started
 
@@ -132,6 +135,7 @@ Property | Type | Description
 autostart? | `boolean` | Boolean indicating if Woltage should start automatically after creation. Use [`woltage.start()`](#start) to start manually.<br>Default: `true`
 [scheduler?](#scheduler) | `{adapter: typeof IScheduler, args?: any[]}` | If the application needs to schedule commands, a scheduler is needed. If no scheduler is provided, [`woltage.scheduleCommand()`](#schedulecommand) will throw an error.
 [eventCastingFallback?](#remote-casting) | `(event: Event, targetVersion: number, strict?: boolean) => Promise<Event>` | A fallback function for event casting when automatic casting fails due to unknown event versions.
+[plugins?](#plugins) | `Plugin[]` | A list of plugins to use.
 
 > \* Important:\
 If the directory (or a subdirectory) contains other modules, these modules will be imported too, which could lead to side effects.
@@ -322,10 +326,61 @@ This allows you to (for example) perform a web request to some service that alwa
 
 The automatic casting currently only supports [Zod](https://zod.dev/) schemas.
 
+### Tombstone Event
+
+The `TombstoneEvent` is a special type of event used to permanently remove all events associated with a specific [aggregate ID](#aggregate) from the event store.
+
+Unlike regular domain events, a tombstone event does not represent a business action within the domain. Its primary purpose is data erasure and regulatory compliance, such as fulfilling requirements imposed by the GDPR or similar privacy regulations.
+
+Unlike regular domain events, a tombstone event does not represent a business action within the domain. Its primary purpose is data erasure and regulatory compliance, such as fulfilling requirements imposed by the GDPR or similar privacy regulations.
+
+For example, an `AccountClosed` event indicates that a user account has been closed as part of the domain model, while an account tombstone indicates that all historical data for that aggregate should be removed. These concepts serve different purposes and should not be treated as equivalent.
+
+When a tombstone event is emitted:
+- All events belonging to the specified aggregate ID are deleted.
+- [Projectors](#projector) can react to the tombstone event and remove any related projection data (for example, deleting a user record from a database).
+- The aggregate is considered permanently erased.
+
+A tombstone event can be emitted directly using `TombstoneEvent` itself or through a custom event class that extends it:
+
+```typescript
+import {TombstoneEvent} from 'woltage';
+import z from 'zod';
+
+const tombstoneSchema = z.object({
+    reason: z.string()
+});
+
+class UserTerminated extends TombstoneEvent<typeof tombstoneSchema>
+{
+    static schema = tombstoneSchema;
+}
+
+const variant1 = new TombstoneEvent();
+const variant2 = new UserTerminated({
+    payload: {reason: 'GDPR'}
+});
+
+console.log(
+    variant1 instanceof TombstoneEvent, // true
+    variant2 instanceof TombstoneEvent // true
+);
+```
+
+Once a tombstone event has been emitted for an aggregate:
+- Loading events for that aggregate ID is no longer possible.
+- Appending new events to that aggregate ID is prohibited.
+- Any attempt to read from or write to the aggregate will result in an error.
+
+This behavior ensures that an aggregate marked with a tombstone event cannot be accidentally recreated or accessed after deletion.
+
+> Important:\
+The actual deletion behavior is implemented by the event store. Applications and aggregates only emit tombstone events; the event store is responsible for processing those events, removing the aggregate's event stream, and preventing future writes to the same aggregate ID.
+
 ## Aggregate
 
 When it comes to producing events, Woltage uses the aggregate pattern.
-An aggregate needs to have a name and an [aggregate projector](#aggregate-projector). After the aggregate was created, you can register [commands](#command) to it. These commands can produce events. An example for an order aggregate:
+An aggregate needs to have a type and an [aggregate projector](#aggregate-projector). After the aggregate was created, you can register [commands](#command) to it. These commands can produce events. An example for an order aggregate:
 
 ```typescript
 import {
@@ -766,7 +821,7 @@ A scheduler adapter that implements the `IScheduler` interface is used to handle
 
 ## Woltage Instance
 
-
+What a Woltage instance provides...
 
 ### executeCommand
 
@@ -846,3 +901,96 @@ To start the application.
 `async stop(): Promise<void>`
 
 To gracefully stop the application.
+
+## Plugins
+
+The Woltage plugin system allows you to hook into critical execution points to observe, validate, transform, and control processing. Plugins are ideal for implementing cross-cutting concerns like **authorization**, **audit logging**, **validation**, and **observability**.
+
+Plugins are [registered](#config) at configuration time and execute **synchronously in registration order**. Each plugin declares which hooks it implements and provides handlers that respond to lifecycle events.
+
+### Plugin Interface
+
+```typescript
+interface Plugin {
+    /** The unique handle for the plugin. */
+    handle: string;
+    /** The name of the plugin. */
+    name?: string;
+    /** The version of the plugin. */
+    version?: string;
+    /**
+     * Defines how unhandled errors thrown by this plugin's hooks should be handled.
+     * - 'log': Errors will be logged to the console, but execution will continue.
+     * - 'throw': Errors will be propagated and may cause execution to fail.
+     * - 'ignore': Errors will be silently ignored.
+     *
+     * Default: 'log'
+     */
+    errorStrategy?: 'log' | 'throw' | 'ignore';
+    /** The hooks that this plugin registers. */
+    hooks?: {
+        /**
+         * Runs before a command's validation.
+         *
+         * May transform the `payload` that's used for validation.
+         */
+        beforeCommandValidation?: BeforeCommandValidationHook;
+        /**
+         * Runs whenever a command validation fails.
+         */
+        onCommandValidationError?: OnCommandValidationErrorHook;
+        /**
+         * Runs before a command handler will be called.
+         *
+         * May transform `state`, `payload`, `context`,
+         * that will be passed to the command handler.
+         */
+        beforeCommandExecution?: BeforeCommandExecutionHook;
+        /**
+         * Runs whenever a command handler throws an error.
+         */
+        onCommandExecutionError?: OnCommandExecutionErrorHook;
+        /**
+         * Runs after a command handler was executed.
+         *
+         * May manipulate the return value of the command handler.
+         */
+        afterCommandExecution?: AfterCommandExecutionHook;
+        /**
+         * Runs whenever a command related error occurs.
+         */
+        onCommandError?: OnCommandErrorHook;
+        /**
+         * Runs before a read models's validation.
+         *
+         * May transform the `query` that's used for validation.
+         */
+        beforeReadModelValidation?: BeforeReadModelValidationHook;
+        /**
+         * Runs whenever a read model validation fails.
+         */
+        onReadModelValidationError?: OnReadModelValidationErrorHook;
+        /**
+         * Runs before a read model handler will be called.
+         *
+         * May transform `query`, `context`,
+         * that will be passed to the read model handler.
+         */
+        beforeReadModelExecution?: BeforeReadModelExecutionHook;
+        /**
+         * Runs whenever a read model handler throws an error.
+         */
+        onReadModelExecutionError?: OnReadModelExecutionErrorHook;
+        /**
+         * Runs after a read model handler was executed.
+         *
+         * May manipulate the return value of the read model handler.
+         */
+        afterReadModelExecution?: AfterReadModelExecutionHook;
+        /**
+         * Runs whenever a read model related error occurs.
+         */
+        onReadModelError?: OnReadModelErrorHook;
+    };
+}
+```
