@@ -82,6 +82,7 @@ await describe('Event', async () => {
                     correlationId: 'eventId1',
                     causationId: null,
                     meta: {},
+                    revision: 0n,
                     position: 1n
                 }, false).identity,
                 '{"type":"test.event","version":42}'

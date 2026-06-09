@@ -2,7 +2,6 @@ import {type Mock, mock} from 'node:test';
 import {PassThrough} from 'node:stream';
 import {
     type AppendRevision,
-    type DeleteOptions,
     type Filter,
     type SubscribeOptions,
     type ReadOptions,
@@ -14,6 +13,7 @@ import {
     END
 } from '../../src/adapters/EventStore.ts';
 import Event from '../../src/Event.ts';
+import TombstoneEvent from '../../src/TombstoneEvent.ts';
 import NotFoundError from '../../src/errors/NotFoundError.ts';
 import ConflictError from '../../src/errors/ConflictError.ts';
 
@@ -33,7 +33,6 @@ class EventStoreMock implements IEventStore
     append: Mock<IEventStore['append']>;
     getLatestPosition: Mock<IEventStore['getLatestPosition']>;
     subscribe: Mock<IEventStore['subscribe']>;
-    delete: Mock<IEventStore['delete']>;
 
     constructor() {
         const state = this.state;
@@ -79,9 +78,27 @@ class EventStoreMock implements IEventStore
                 )
                     throw new ConflictError();
 
-                events.forEach((event, idx) => event.position = BigInt(pos + 1n + BigInt(idx)));
+                events.forEach((event, idx) => {
+                    event.revision = BigInt(currentEvents.length + idx);
+                    event.position = BigInt(pos + 1n + BigInt(idx));
+                });
+
+                const sendTombstone = events.some((event, idx) => {
+                    if(event instanceof TombstoneEvent)
+                    {
+                        if(idx === events.length - 1)
+                            return true;
+                        throw new ConflictError(`Tombstone event is not the last event to append in ${aggregateType} aggregate ${aggregateId}.`);
+                    }
+                    return false;
+                });
+
                 state.existingEvents[aggregateType].push(...events);
                 this.#onEvents(events);
+
+                if(sendTombstone)
+                    state.existingEvents[aggregateType] = state.existingEvents[aggregateType]
+                        .filter(event => event.aggregateId !== aggregateId);
             }
         );
 
@@ -107,39 +124,12 @@ class EventStoreMock implements IEventStore
             (options?: SubscribeOptions) => {
                 const stream = new PassThrough();
 
-
                 //TODO write existing events that match options
 
                 (options?.filter?.types ?? ['$all'])
                     .forEach(type => (this.state.subscriptions[type] ??= []).push(stream));
 
                 return stream;
-            }
-        );
-
-        this.delete = mock.fn(
-            async (aggregateType: string, aggregateId: string, options?: DeleteOptions) => {
-                if(!state.existingEvents[aggregateType]?.length)
-                {
-                    if(options?.revision === STATE_NEW)
-                        return;
-                    throw new NotFoundError();
-                }
-
-                const events = state.existingEvents[aggregateType]
-                    .filter(event => event.aggregateId === aggregateId);
-
-                if(
-                    options?.revision !== undefined
-                    && (
-                        options.revision === STATE_NEW
-                        || options.revision !== BigInt(events.length - 1)
-                    )
-                )
-                    throw new ConflictError();
-
-                state.existingEvents[aggregateType] = state.existingEvents[aggregateType]
-                    .filter(event => event.aggregateId !== aggregateId);
             }
         );
     }

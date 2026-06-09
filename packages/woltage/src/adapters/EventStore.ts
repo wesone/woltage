@@ -64,20 +64,38 @@ export type SubscribeOptions = {
 
 export type SubscriptionStream = ReadableStream<Event>;
 
-export type DeleteOptions = {
-    /**
-     * If the revision is of type BigInt, the revision corresponds to the event index inside the stream.
-     */
-    revision?: bigint | typeof STATE_NEW;
-};
-
 export interface IEventStore {
     connect(): Promise<void>;
     close(force?: boolean): Promise<void>;
 
+    /**
+     * Reads the existing events of a stream.
+     *
+     * @param aggregateType
+     * @param aggregateId
+     * @param options
+     * @returns Async iterator that returns event instances populated with `revision` and `position`
+     */
     read(aggregateType: string, aggregateId: string, options?: ReadOptions): AsyncIterableIterator<Event>;
+    /**
+     * Appends events to a stream.
+     *
+     * @param aggregateType
+     * @param aggregateId
+     * @param events
+     * @param revision
+     */
     append(aggregateType: string, aggregateId: string, events: Event[], revision?: AppendRevision): Promise<void>;
+    /**
+     * Subscribes to events.
+     *
+     * @param options
+     */
     subscribe(options?: SubscribeOptions): SubscriptionStream;
+    /**
+     * Returns the position of the latest event.
+     *
+     * @param filter
+     */
     getLatestPosition(filter?: Filter): Promise<bigint | null>;
-    delete(aggregateType: string, aggregateId: string, options?: DeleteOptions): Promise<void>;
 };

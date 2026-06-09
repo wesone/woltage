@@ -154,20 +154,22 @@ class Aggregate<TState = any>
 
     async #statusHydrator(status: AggregateStatus<TState>) {
         const {eventStore} = readContext(executionStorage);
-        const events = eventStore.read(
-            this.type,
-            status.aggregateId,
-            {
-                fromRevision: typeof status.revision === 'bigint'
-                    ? status.revision + 1n
-                    : undefined
-            }
-        );
+
         try
         {
+            const events = eventStore.read(
+                this.type,
+                status.aggregateId,
+                {
+                    fromRevision: typeof status.revision === 'bigint'
+                        ? status.revision + 1n
+                        : undefined
+                }
+            );
+
             for await (const event of events)
             {
-                status.revision = BigInt(status.aggregateVersion);
+                status.revision = event.revision;
                 status.aggregateVersion++;
                 const {event: transformedEvent, handler = this.projector.$all} = await this.#registry.get(event);
                 status.state = handler?.(status.state, transformedEvent) ?? status.state;

@@ -21,12 +21,15 @@ export type EventData<TPayload extends PayloadSchema = any, TMeta = any> = {
     correlationId: string,
     causationId: string | null,
     meta: TMeta,
+    revision: bigint,
     position: bigint
 };
 
-export type SerializedEventData<TPayload extends PayloadSchema = any, TMeta = any> = Omit<EventData<TPayload, TMeta>, 'position'> & {position: string};
+export type SerializedEventData<TPayload extends PayloadSchema = any, TMeta = any> =
+    Omit<EventData<TPayload, TMeta>, 'revision' | 'position'> & {revision: string, position: string};
 
-export type EventConstructionData<TPayload extends PayloadSchema, TMeta = any> = EventData<TPayload, TMeta> | EventInitData<TPayload, TMeta>;
+export type EventConstructionData<TPayload extends PayloadSchema, TMeta = any> =
+    EventData<TPayload, TMeta> | EventInitData<TPayload, TMeta>;
 
 export type EventIdentityData<T extends typeof Event = any> = {
     type: T['type'],
@@ -83,8 +86,10 @@ export default class Event<TPayload extends PayloadSchema = any, TMeta = any>
 
     static fromJSON(data: SerializedEventData | EventData | Event, shouldValidate: boolean = false) {
         const eventData = 'toJSON' in data ? data.toJSON() : data;
-        if(typeof eventData.position === 'string')
-            eventData.position = BigInt(eventData.position.slice(0, -1));
+        (['revision', 'position'] as const).forEach(field => {
+            if(typeof eventData[field] === 'string')
+                eventData[field] = BigInt(eventData[field].slice(0, -1));
+        });
         return new (getEventClass(data.type, data.version))(eventData, shouldValidate);
     }
 
@@ -99,6 +104,7 @@ export default class Event<TPayload extends PayloadSchema = any, TMeta = any>
     correlationId: string;
     causationId: string | null;
     meta: TMeta;
+    revision;
     position;
 
     constructor(data: EventConstructionData<TPayload, TMeta>, shouldValidate: boolean = true) {
@@ -119,6 +125,7 @@ export default class Event<TPayload extends PayloadSchema = any, TMeta = any>
             correlationId,
             causationId,
             meta = {},
+            revision = -1n,
             position = -1n
         } = data as EventData<TPayload>;
 
@@ -130,6 +137,7 @@ export default class Event<TPayload extends PayloadSchema = any, TMeta = any>
         this.correlationId = correlationId ?? currentEvent?.correlationId ?? id;
         this.causationId = causationId ?? currentEvent?.id ?? null;
         this.meta = meta as TMeta;
+        this.revision = revision;
         this.position = position;
 
         this.payload = shouldValidate
@@ -166,6 +174,7 @@ export default class Event<TPayload extends PayloadSchema = any, TMeta = any>
             correlationId: this.correlationId,
             causationId: this.causationId,
             meta: this.meta,
+            revision: `${this.revision}n`,
             position: `${this.position}n`
         } satisfies SerializedEventData<TPayload, TMeta>;
     }

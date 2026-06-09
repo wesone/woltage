@@ -14,6 +14,7 @@ export * from './src/adapters/Store.ts';
 
 export type * from './src/Event.ts';
 export {default as Event} from './src/Event.ts';
+export {default as TombstoneEvent} from './src/TombstoneEvent.ts';
 export * from './src/EventCaster.ts';
 export {default as EventCaster} from './src/EventCaster.ts';
 export type * from './src/write/Aggregate.ts';
